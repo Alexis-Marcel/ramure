@@ -64,6 +64,72 @@ describe('layout', () => {
     expect(focal.y).toBe(0)
   })
 
+  it('affiche les collatéraux : fratries, oncles et cousins', () => {
+    // grands-parents → [père, oncle] ; oncle + tante → cousin ; parents → [focal, sœur]
+    const ged = `
+0 @I1@ INDI
+1 NAME Focal /Test/
+1 FAMC @F1@
+0 @I2@ INDI
+1 NAME Père /Test/
+1 FAMC @F2@
+1 FAMS @F1@
+0 @I3@ INDI
+1 NAME Mère /Test/
+1 FAMS @F1@
+0 @I4@ INDI
+1 NAME Sœur /Test/
+1 FAMC @F1@
+0 @I5@ INDI
+1 NAME Grand-père /Test/
+1 FAMS @F2@
+0 @I6@ INDI
+1 NAME Grand-mère /Test/
+1 FAMS @F2@
+0 @I7@ INDI
+1 NAME Oncle /Test/
+1 FAMC @F2@
+1 FAMS @F3@
+0 @I8@ INDI
+1 NAME Tante /Test/
+1 FAMS @F3@
+0 @I9@ INDI
+1 NAME Cousin /Test/
+1 FAMC @F3@
+0 @F1@ FAM
+1 HUSB @I2@
+1 WIFE @I3@
+1 CHIL @I1@
+1 CHIL @I4@
+0 @F2@ FAM
+1 HUSB @I5@
+1 WIFE @I6@
+1 CHIL @I2@
+1 CHIL @I7@
+0 @F3@ FAM
+1 HUSB @I7@
+1 WIFE @I8@
+1 CHIL @I9@
+0 TRLR`
+    const tree = parseGedcom(ged)
+    const layout = computeLayout(tree, '@I1@')
+    // tout l'arbre est visible depuis la personne de référence
+    expect(layout.nodes).toHaveLength(9)
+    for (let i = 0; i < layout.nodes.length; i++) {
+      for (let j = i + 1; j < layout.nodes.length; j++) {
+        const a = layout.nodes[i]
+        const b = layout.nodes[j]
+        const overlap =
+          a.x < b.x + CARD_W && b.x < a.x + CARD_W && a.y < b.y + CARD_H && b.y < a.y + CARD_H
+        expect(overlap, `${a.person.id} chevauche ${b.person.id}`).toBe(false)
+      }
+    }
+    // le cousin pend sous l'oncle, une génération sous les parents
+    const uncle = layout.nodes.find((n) => n.person.id === '@I7@')!
+    const cousin = layout.nodes.find((n) => n.person.id === '@I9@')!
+    expect(uncle.y).toBeLessThan(cousin.y)
+  })
+
   it('ne boucle pas sur un arbre vide ou un id inconnu', () => {
     expect(computeLayout({ persons: {}, unions: {} }, '@I1@').nodes).toHaveLength(0)
     expect(computeLayout(sampleTree(), '@ZZZ@').nodes).toHaveLength(0)
