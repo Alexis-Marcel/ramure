@@ -22,6 +22,9 @@ export interface Union {
   children: string[]
   marriageDate?: string
   marriagePlace?: string
+  /** le couple n'est plus ensemble (séparation ou divorce) */
+  separated?: boolean
+  divorceDate?: string
 }
 
 export interface Tree {

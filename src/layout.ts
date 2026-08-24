@@ -20,6 +20,10 @@ export interface LayoutLink {
   /** chemin SVG de la tige */
   d: string
   kind: 'lineage' | 'union'
+  /** union rompue (séparation ou divorce) — dessinée barrée */
+  broken?: boolean
+  /** milieu du trait d'union, pour poser le symbole de rupture */
+  mid?: { x: number; y: number }
 }
 
 export interface TreeLayout {
@@ -184,9 +188,14 @@ export function computeLayout(tree: Tree, focalId: string): TreeLayout {
       addNode(partner, pcx, gen)
       partnerCx.set(unionId, pcx)
       const y = rowY(gen) + CARD_H / 2
+      const x1 = prevCx + CARD_W / 2
+      const x2 = pcx - CARD_W / 2
+      const u = tree.unions[unionId]
       links.push({
-        d: `M ${prevCx + CARD_W / 2} ${y} L ${pcx - CARD_W / 2} ${y}`,
+        d: `M ${x1} ${y} L ${x2} ${y}`,
         kind: 'union',
+        broken: Boolean(u.separated || u.divorceDate),
+        mid: { x: (x1 + x2) / 2, y },
       })
       prevCx = pcx
       rowX += CARD_W + COUPLE_GAP

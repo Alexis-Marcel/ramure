@@ -30,15 +30,26 @@ export function TreeSvg({ layout, selectedId, onSelect, onFocus, actions }: Prop
             strokeLinecap="round"
           />
         ) : (
-          <path
-            key={i}
-            d={link.d}
-            fill="none"
-            stroke="#C6CFC4"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeDasharray="0.5 6"
-          />
+          <g key={i}>
+            <path
+              d={link.d}
+              fill="none"
+              stroke="#C6CFC4"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeDasharray="0.5 6"
+            />
+            {link.broken && link.mid && (
+              // symbole généalogique de rupture d'union : deux barres obliques
+              <path
+                d={`M ${link.mid.x - 6} ${link.mid.y + 5} L ${link.mid.x - 1} ${link.mid.y - 5} M ${link.mid.x + 1} ${link.mid.y + 5} L ${link.mid.x + 6} ${link.mid.y - 5}`}
+                fill="none"
+                stroke="#6B7469"
+                strokeWidth={1.6}
+                strokeLinecap="round"
+              />
+            )}
+          </g>
         ),
       )}
       {layout.nodes.map((node) => (

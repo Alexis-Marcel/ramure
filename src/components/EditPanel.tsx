@@ -204,7 +204,10 @@ export function EditPanel() {
             .filter((c): c is Person => Boolean(c))
           return (
             <div key={u.id} className="union-block">
-              <h3>{partner ? `Union avec ${fullName(partner)}` : 'Union'}</h3>
+              <h3>
+                {partner ? `Union avec ${fullName(partner)}` : 'Union'}
+                {(u.separated || u.divorceDate) && ' · séparés'}
+              </h3>
               <div className="field-row">
                 <Field
                   label="Date"
@@ -217,6 +220,26 @@ export function EditPanel() {
                   onChange={(v) => updateUnion(u.id, { marriagePlace: v })}
                 />
               </div>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={Boolean(u.separated || u.divorceDate)}
+                  onChange={(e) =>
+                    updateUnion(u.id, {
+                      separated: e.target.checked || undefined,
+                      divorceDate: e.target.checked ? u.divorceDate : undefined,
+                    })
+                  }
+                />
+                <span>Séparés ou divorcés</span>
+              </label>
+              {(u.separated || u.divorceDate) && (
+                <Field
+                  label="Date de séparation"
+                  value={u.divorceDate ?? ''}
+                  onChange={(v) => updateUnion(u.id, { divorceDate: v })}
+                />
+              )}
               {children.length > 0 && (
                 <ul className="link-list">
                   {children.map((c) => (

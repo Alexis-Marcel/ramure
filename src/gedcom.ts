@@ -98,10 +98,10 @@ export function parseGedcom(text: string): Tree {
 
     if (line.tag === 'FAM' && line.xref) {
       const u: Union = { id: line.xref, partners: [], children: [] }
-      let inMarr = false
+      let context: 'MARR' | 'DIV' | null = null
       for (const l of record) {
         if (l.level === 1) {
-          inMarr = false
+          context = null
           switch (l.tag) {
             case 'HUSB':
             case 'WIFE':
@@ -111,12 +111,18 @@ export function parseGedcom(text: string): Tree {
               u.children.push(l.value)
               break
             case 'MARR':
-              inMarr = true
+              context = 'MARR'
+              break
+            case 'DIV':
+              context = 'DIV'
+              u.separated = true
               break
           }
-        } else if (l.level === 2 && inMarr) {
+        } else if (l.level === 2 && context === 'MARR') {
           if (l.tag === 'DATE') u.marriageDate = l.value
           if (l.tag === 'PLAC') u.marriagePlace = l.value
+        } else if (l.level === 2 && context === 'DIV') {
+          if (l.tag === 'DATE') u.divorceDate = l.value
         }
       }
       tree.unions[u.id] = u
@@ -184,6 +190,10 @@ export function serializeGedcom(tree: Tree): string {
       out.push('1 MARR')
       if (u.marriageDate) out.push(`2 DATE ${u.marriageDate}`)
       if (u.marriagePlace) out.push(`2 PLAC ${u.marriagePlace}`)
+    }
+    if (u.separated || u.divorceDate) {
+      out.push('1 DIV')
+      if (u.divorceDate) out.push(`2 DATE ${u.divorceDate}`)
     }
   }
   out.push('0 TRLR')
