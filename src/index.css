@@ -101,6 +101,7 @@ button {
   font-weight: 500;
   transition: border-color 0.15s, background 0.15s, transform 0.1s;
   list-style: none;
+  white-space: nowrap;
 }
 
 .btn:hover {
@@ -777,6 +778,38 @@ button:focus-visible {
     z-index: 10;
     box-shadow: var(--ombre-forte);
     max-width: 88vw;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .brand {
+    gap: 6px;
+  }
+
+  .brand-name {
+    font-size: 17px;
+  }
+
+  .topbar-actions {
+    gap: 5px;
+  }
+
+  .btn {
+    padding: 7px 11px;
+    font-size: 13px;
+  }
+
+  .menu-list {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    top: 54px;
+    min-width: 0;
   }
 }
 

@@ -35,6 +35,8 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus, actions
   const svgRef = useRef<SVGSVGElement>(null)
   const [vb, setVb] = useState<ViewBox>({ x: -600, y: -400, w: 1200, h: 800 })
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null)
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ dist: number } | null>(null)
 
   const fit = useCallback(() => {
     const svg = svgRef.current
@@ -48,6 +50,12 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus, actions
     fit()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focalId, layout.nodes.length === 0])
+
+  // recadre quand l'écran change de taille (rotation d'un téléphone…)
+  useEffect(() => {
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [fit])
 
   const zoomAt = (factor: number, clientX?: number, clientY?: number) => {
     const svg = svgRef.current
@@ -80,9 +88,34 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus, actions
         ref={svgRef}
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         onPointerDown={(e) => {
-          drag.current = { x: e.clientX, y: e.clientY, moved: false }
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+          if (pointers.current.size === 2) {
+            // début de pincement : deux doigts posés
+            const [a, b] = [...pointers.current.values()]
+            pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y) }
+            drag.current = null
+            try {
+              for (const id of pointers.current.keys()) e.currentTarget.setPointerCapture(id)
+            } catch {
+              // certains navigateurs refusent la capture : le pincement marche sans
+            }
+          } else if (pointers.current.size === 1) {
+            drag.current = { x: e.clientX, y: e.clientY, moved: false }
+          }
         }}
         onPointerMove={(e) => {
+          if (pointers.current.has(e.pointerId)) {
+            pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+          }
+          if (pinch.current && pointers.current.size >= 2) {
+            const [a, b] = [...pointers.current.values()]
+            const dist = Math.hypot(a.x - b.x, a.y - b.y)
+            if (dist > 0) {
+              zoomAt(pinch.current.dist / dist, (a.x + b.x) / 2, (a.y + b.y) / 2)
+              pinch.current.dist = dist
+            }
+            return
+          }
           if (!drag.current) return
           const rect = e.currentTarget.getBoundingClientRect()
           const dx = e.clientX - drag.current.x
@@ -91,7 +124,11 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus, actions
             drag.current.moved = true
             // capturer seulement une fois le déplacement engagé : capturer dès le
             // pointerdown détournerait le click des fiches vers le SVG
-            e.currentTarget.setPointerCapture(e.pointerId)
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId)
+            } catch {
+              // capture refusée : le déplacement reste possible tant que le pointeur est sur le SVG
+            }
           }
           if (!drag.current.moved) return
           setVb((v) => ({
@@ -101,8 +138,18 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus, actions
           }))
           drag.current = { ...drag.current, x: e.clientX, y: e.clientY }
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
+          pointers.current.delete(e.pointerId)
+          if (pinch.current) {
+            if (pointers.current.size < 2) pinch.current = null
+            return
+          }
           if (drag.current && !drag.current.moved) onSelect(null)
+          drag.current = null
+        }}
+        onPointerCancel={(e) => {
+          pointers.current.delete(e.pointerId)
+          if (pointers.current.size < 2) pinch.current = null
           drag.current = null
         }}
       >
