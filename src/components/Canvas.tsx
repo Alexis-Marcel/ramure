@@ -79,14 +79,19 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus }: Props
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         onPointerDown={(e) => {
           drag.current = { x: e.clientX, y: e.clientY, moved: false }
-          e.currentTarget.setPointerCapture(e.pointerId)
         }}
         onPointerMove={(e) => {
           if (!drag.current) return
           const rect = e.currentTarget.getBoundingClientRect()
           const dx = e.clientX - drag.current.x
           const dy = e.clientY - drag.current.y
-          if (Math.abs(dx) + Math.abs(dy) > 2) drag.current.moved = true
+          if (!drag.current.moved && Math.abs(dx) + Math.abs(dy) > 2) {
+            drag.current.moved = true
+            // capturer seulement une fois le déplacement engagé : capturer dès le
+            // pointerdown détournerait le click des fiches vers le SVG
+            e.currentTarget.setPointerCapture(e.pointerId)
+          }
+          if (!drag.current.moved) return
           setVb((v) => ({
             ...v,
             x: v.x - (dx / rect.width) * v.w,
