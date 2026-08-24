@@ -13,6 +13,22 @@ function randomId(prefix: 'I' | 'F'): string {
   return `@${prefix}${suffix}@`
 }
 
+/** Supprime une union devenue inutile : sans enfants et au plus un partenaire,
+ * ou réduite à un enfant unique sans aucun parent. */
+function pruneUnion(tree: Tree, unionId: string) {
+  const u = tree.unions[unionId]
+  if (!u) return
+  const childless = u.children.length === 0 && u.partners.length <= 1
+  const lastOrphanChild = u.partners.length === 0 && u.children.length === 1
+  if (childless || lastOrphanChild) {
+    for (const c of u.children) {
+      const child = tree.persons[c]
+      if (child && child.famc === unionId) child.famc = undefined
+    }
+    delete tree.unions[unionId]
+  }
+}
+
 interface State {
   tree: Tree
   focalId: string | null
@@ -24,12 +40,22 @@ interface State {
   addPerson: (fields?: Partial<Person>) => string
   updatePerson: (id: string, fields: Partial<Person>) => void
   deletePerson: (id: string) => void
-  /** Relie un parent existant, ou crée les deux parents si existingId est absent. */
+  /** Relie un parent existant, ou crée le(s) parent(s) manquant(s) si existingId est absent. */
   addParents: (childId: string, existingId?: string) => void
+  /** Retire une personne des partenaires d'une union (la personne reste dans l'arbre). */
+  removeUnionPartner: (unionId: string, partnerId: string) => void
+  /** Retire un enfant d'une union (l'enfant reste dans l'arbre). */
+  removeUnionChild: (unionId: string, childId: string) => void
   /** Relie un·e partenaire existant·e, ou en crée un·e si existingId est absent. */
   addPartner: (personId: string, existingId?: string) => void
   /** Relie un enfant existant (sans parents connus), ou en crée un si existingId est absent. */
-  addChild: (personId: string, existingId?: string) => void
+  addChild: (personId: string, existingId?: string, unionId?: string) => void
+  /** Ajout d'enfant en attente du choix de l'union (personne avec plusieurs partenaires). */
+  pendingChild: { personId: string; existingId?: string } | null
+  /** Point d'entrée : ajoute directement, ou demande l'union quand il y a ambiguïté. */
+  requestAddChild: (personId: string, existingId?: string) => void
+  resolveAddChild: (unionId: string) => void
+  cancelAddChild: () => void
   updateUnion: (id: string, fields: Partial<Union>) => void
   loadSample: () => void
   clearAll: () => void
@@ -101,7 +127,30 @@ export const useStore = create<State>((set, get) => {
     addParents: (childId, existingId) => {
       commit((tree) => {
         const child = tree.persons[childId]
-        if (!child || child.famc) return
+        if (!child) return
+
+        // complète l'union parentale existante s'il manque un parent
+        const famcUnion = child.famc ? tree.unions[child.famc] : undefined
+        if (famcUnion) {
+          if (famcUnion.partners.length >= 2) return
+          if (existingId && tree.persons[existingId]) {
+            if (!famcUnion.partners.includes(existingId)) famcUnion.partners.push(existingId)
+          } else {
+            const other = tree.persons[famcUnion.partners[0]]
+            const sex = other?.sex === 'M' ? 'F' : other?.sex === 'F' ? 'M' : 'U'
+            const parentId = randomId('I')
+            tree.persons[parentId] = {
+              id: parentId,
+              givenName: '',
+              surname: sex === 'M' ? child.surname : '',
+              sex,
+              fams: [famcUnion.id],
+            }
+            famcUnion.partners.push(parentId)
+          }
+          return
+        }
+
         const unionId = randomId('F')
         if (existingId && tree.persons[existingId]) {
           tree.unions[unionId] = { id: unionId, partners: [existingId], children: [childId] }
@@ -125,6 +174,26 @@ export const useStore = create<State>((set, get) => {
           tree.unions[unionId] = { id: unionId, partners: [fatherId, motherId], children: [childId] }
         }
         child.famc = unionId
+      })
+    },
+
+    removeUnionPartner: (unionId, partnerId) => {
+      commit((tree) => {
+        const u = tree.unions[unionId]
+        if (!u) return
+        u.partners = u.partners.filter((p) => p !== partnerId)
+        pruneUnion(tree, unionId)
+      })
+    },
+
+    removeUnionChild: (unionId, childId) => {
+      commit((tree) => {
+        const u = tree.unions[unionId]
+        if (!u) return
+        u.children = u.children.filter((c) => c !== childId)
+        const child = tree.persons[childId]
+        if (child && child.famc === unionId) child.famc = undefined
+        pruneUnion(tree, unionId)
       })
     },
 
@@ -157,7 +226,7 @@ export const useStore = create<State>((set, get) => {
       if (partnerId) set({ selectedId: partnerId })
     },
 
-    addChild: (personId, existingId) => {
+    addChild: (personId, existingId, chosenUnionId) => {
       let childId = existingId ?? ''
       commit((tree) => {
         const p = tree.persons[personId]
@@ -166,7 +235,8 @@ export const useStore = create<State>((set, get) => {
           const child = tree.persons[existingId]
           if (!child || child.famc || existingId === personId) return
         }
-        let unionId = p.fams[0]
+        let unionId =
+          chosenUnionId && p.fams.includes(chosenUnionId) ? chosenUnionId : p.fams[0]
         if (!unionId) {
           unionId = randomId('F')
           tree.unions[unionId] = { id: unionId, partners: [personId], children: [] }
@@ -190,6 +260,24 @@ export const useStore = create<State>((set, get) => {
       })
       if (childId) set({ selectedId: childId })
     },
+
+    pendingChild: null,
+
+    requestAddChild: (personId, existingId) => {
+      const { tree, addChild } = get()
+      const unions = (tree.persons[personId]?.fams ?? []).filter((u) => tree.unions[u])
+      if (unions.length > 1) set({ pendingChild: { personId, existingId } })
+      else addChild(personId, existingId)
+    },
+
+    resolveAddChild: (unionId) => {
+      const pending = get().pendingChild
+      if (!pending) return
+      set({ pendingChild: null })
+      get().addChild(pending.personId, pending.existingId, unionId)
+    },
+
+    cancelAddChild: () => set({ pendingChild: null }),
 
     updateUnion: (id, fields) =>
       commit((tree) => {

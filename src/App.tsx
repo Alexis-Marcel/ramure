@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { currentSpace, joinSpace, loadUiPrefs, spaceFromHash } from './collab'
 import { Canvas } from './components/Canvas'
+import { ChildUnionChooser } from './components/ChildUnionChooser'
 import { CollabPanel } from './components/CollabPanel'
 import { EditPanel } from './components/EditPanel'
 import { EmptyState } from './components/EmptyState'
@@ -36,7 +37,7 @@ export default function App() {
   const setTree = useStore((s) => s.setTree)
   const addParents = useStore((s) => s.addParents)
   const addPartner = useStore((s) => s.addPartner)
-  const addChild = useStore((s) => s.addChild)
+  const requestAddChild = useStore((s) => s.requestAddChild)
 
   const hydrated = useStore((s) => s.hydrated)
   // la modale s'ouvre d'emblée quand on arrive par un lien d'invitation inconnu
@@ -130,13 +131,18 @@ export default function App() {
             selectedId={selectedId}
             onSelect={select}
             onFocus={setFocal}
-            actions={{ onAddParents: addParents, onAddPartner: addPartner, onAddChild: addChild }}
+            actions={{
+              onAddParents: addParents,
+              onAddPartner: addPartner,
+              onAddChild: requestAddChild,
+            }}
           />
         ) : (
           <EmptyState onImport={handleImport} />
         )}
         <EditPanel />
       </div>
+      <ChildUnionChooser />
       {collabOpen && <CollabPanel onClose={() => setCollabOpen(false)} />}
     </div>
   )

@@ -496,7 +496,8 @@ button:focus-visible {
   gap: 6px;
 }
 
-.relation-actions button {
+.relation-actions button,
+.relation-add {
   padding: 9px 12px;
   border: 1px solid var(--bord);
   border-radius: 10px;
@@ -506,7 +507,8 @@ button:focus-visible {
   transition: border-color 0.15s, background 0.15s;
 }
 
-.relation-actions button:hover:not(:disabled) {
+.relation-actions button:hover:not(:disabled),
+.relation-add:hover:not(:disabled) {
   border-color: var(--accent);
   background: var(--accent-pale);
 }
@@ -515,6 +517,72 @@ button:focus-visible {
   color: var(--encre-3);
   font-weight: 400;
   cursor: default;
+}
+
+.relation-add.subtle {
+  border-color: transparent;
+  color: var(--encre-2);
+  font-weight: 400;
+  font-size: 12.5px;
+  padding: 5px 12px;
+}
+
+.relation-add.subtle:hover {
+  background: none;
+  border-color: var(--bord);
+  color: var(--encre);
+}
+
+.union-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-person {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--bord);
+  background: var(--bg);
+  text-align: left;
+}
+
+.link-person:hover {
+  border-color: var(--accent);
+}
+
+.unlink {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--encre-3);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.unlink:hover {
+  color: var(--danger);
+  background: rgba(209, 72, 58, 0.08);
 }
 
 .btn-danger {

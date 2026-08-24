@@ -1,17 +1,14 @@
 import { useState } from 'react'
 import { collectAncestors, collectDescendants } from '../relatives'
 import { useStore } from '../store'
-import { fullName } from '../types'
-import type { Person, Sex } from '../types'
+import { fullName, lifespan } from '../types'
+import type { Person, Sex, Union } from '../types'
 import { PersonPicker } from './PersonPicker'
 
-type PickKind = 'parents' | 'partner' | 'child'
-
-const PICKER_TEXT: Record<PickKind, { title: string; createLabel: string }> = {
-  parents: { title: 'Relier un parent', createLabel: 'Créer ses deux parents' },
-  partner: { title: 'Relier un·e partenaire', createLabel: 'Créer un·e nouveau·elle partenaire' },
-  child: { title: 'Relier un enfant', createLabel: 'Créer un nouvel enfant' },
-}
+type PickTarget =
+  | { kind: 'parents' }
+  | { kind: 'partner' }
+  | { kind: 'child'; unionId?: string }
 
 function Field({
   label,
@@ -32,6 +29,31 @@ function Field({
   )
 }
 
+/** Ligne d'une personne reliée : ouvre sa fiche, ou retire le lien (sans la supprimer). */
+function LinkRow({
+  person,
+  onOpen,
+  onUnlink,
+  unlinkLabel,
+}: {
+  person: Person
+  onOpen: () => void
+  onUnlink: () => void
+  unlinkLabel: string
+}) {
+  return (
+    <li className="link-row">
+      <button className="link-person" onClick={onOpen} title="Ouvrir cette fiche">
+        <span className="person-name">{fullName(person)}</span>
+        <span className="person-dates">{lifespan(person)}</span>
+      </button>
+      <button className="unlink" onClick={onUnlink} title={unlinkLabel} aria-label={unlinkLabel}>
+        ×
+      </button>
+    </li>
+  )
+}
+
 export function EditPanel() {
   const tree = useStore((s) => s.tree)
   const selectedId = useStore((s) => s.selectedId)
@@ -44,36 +66,58 @@ export function EditPanel() {
   const addParents = useStore((s) => s.addParents)
   const addPartner = useStore((s) => s.addPartner)
   const addChild = useStore((s) => s.addChild)
+  const removeUnionPartner = useStore((s) => s.removeUnionPartner)
+  const removeUnionChild = useStore((s) => s.removeUnionChild)
 
-  const [pickFor, setPickFor] = useState<PickKind | null>(null)
+  const [pick, setPick] = useState<PickTarget | null>(null)
 
   const person: Person | undefined = selectedId ? tree.persons[selectedId] : undefined
   if (!person) return null
 
   const set = (fields: Partial<Person>) => updatePerson(person.id, fields)
-  const unions = person.fams.map((id) => tree.unions[id]).filter(Boolean)
+  const famcUnion: Union | undefined = person.famc ? tree.unions[person.famc] : undefined
+  const parents = (famcUnion?.partners ?? [])
+    .map((id) => tree.persons[id])
+    .filter((p): p is Person => Boolean(p))
+  const unions = person.fams
+    .map((id) => tree.unions[id])
+    .filter((u): u is Union => Boolean(u))
 
   /** Personnes reliables pour chaque type de lien (sans créer d'incohérence). */
-  const eligible = (kind: PickKind): Person[] => {
+  const eligible = (kind: PickTarget['kind']): Person[] => {
     const ancestors = collectAncestors(tree, person.id)
     const descendants = collectDescendants(tree, person.id)
     const partners = new Set(
       unions.flatMap((u) => u.partners).filter((id) => id !== person.id),
     )
+    const existingParents = new Set(famcUnion?.partners ?? [])
     return Object.values(tree.persons).filter((p) => {
       if (p.id === person.id || ancestors.has(p.id) || descendants.has(p.id) || partners.has(p.id))
         return false
+      if (kind === 'parents' && existingParents.has(p.id)) return false
       if (kind === 'child' && p.famc) return false
       return true
     })
   }
 
-  const linkExisting = (kind: PickKind, id?: string) => {
-    if (kind === 'parents') addParents(person.id, id)
-    if (kind === 'partner') addPartner(person.id, id)
-    if (kind === 'child') addChild(person.id, id)
-    setPickFor(null)
+  const doLink = (id?: string) => {
+    if (!pick) return
+    if (pick.kind === 'parents') addParents(person.id, id)
+    if (pick.kind === 'partner') addPartner(person.id, id)
+    if (pick.kind === 'child') addChild(person.id, id, pick.unionId)
+    setPick(null)
   }
+
+  const pickerText = !pick
+    ? null
+    : pick.kind === 'parents'
+      ? {
+          title: 'Ajouter un parent',
+          createLabel: parents.length === 1 ? "Créer l'autre parent" : 'Créer ses deux parents',
+        }
+      : pick.kind === 'partner'
+        ? { title: 'Ajouter un·e partenaire', createLabel: 'Créer un·e nouveau·elle partenaire' }
+        : { title: 'Ajouter un enfant', createLabel: 'Créer un nouvel enfant' }
 
   return (
     <aside className="edit-panel">
@@ -123,11 +167,44 @@ export function EditPanel() {
           />
         </div>
 
+        <h3>Parents</h3>
+        {parents.length > 0 && (
+          <ul className="link-list">
+            {parents.map((pp) => (
+              <LinkRow
+                key={pp.id}
+                person={pp}
+                onOpen={() => select(pp.id)}
+                unlinkLabel="Retirer ce lien de parenté"
+                onUnlink={() => {
+                  if (
+                    famcUnion &&
+                    confirm(
+                      `Retirer ${fullName(pp)} des parents de ${fullName(person)} ? La personne reste dans l'arbre.`,
+                    )
+                  )
+                    removeUnionPartner(famcUnion.id, pp.id)
+                }}
+              />
+            ))}
+          </ul>
+        )}
+        {parents.length < 2 && (
+          <button className="relation-add" onClick={() => setPick({ kind: 'parents' })}>
+            {parents.length === 1 ? "+ Ajouter l'autre parent" : '+ Ajouter ses parents'}
+          </button>
+        )}
+
         {unions.map((u) => {
-          const partner = u.partners.map((p) => tree.persons[p]).find((p) => p && p.id !== person.id)
+          const partner = u.partners
+            .map((p) => tree.persons[p])
+            .find((p): p is Person => Boolean(p) && p.id !== person.id)
+          const children = u.children
+            .map((c) => tree.persons[c])
+            .filter((c): c is Person => Boolean(c))
           return (
-            <div key={u.id}>
-              <h3>Union{partner ? ` avec ${fullName(partner)}` : ''}</h3>
+            <div key={u.id} className="union-block">
+              <h3>{partner ? `Union avec ${fullName(partner)}` : 'Union'}</h3>
               <div className="field-row">
                 <Field
                   label="Date"
@@ -140,9 +217,59 @@ export function EditPanel() {
                   onChange={(v) => updateUnion(u.id, { marriagePlace: v })}
                 />
               </div>
+              {children.length > 0 && (
+                <ul className="link-list">
+                  {children.map((c) => (
+                    <LinkRow
+                      key={c.id}
+                      person={c}
+                      onOpen={() => select(c.id)}
+                      unlinkLabel="Retirer cet enfant de l'union"
+                      onUnlink={() => {
+                        if (
+                          confirm(
+                            `Retirer ${fullName(c)} des enfants de cette union ? La personne reste dans l'arbre.`,
+                          )
+                        )
+                          removeUnionChild(u.id, c.id)
+                      }}
+                    />
+                  ))}
+                </ul>
+              )}
+              <button
+                className="relation-add"
+                onClick={() => setPick({ kind: 'child', unionId: u.id })}
+              >
+                + Ajouter un enfant
+              </button>
+              {partner && (
+                <button
+                  className="relation-add subtle"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        `Retirer le lien entre ${fullName(person)} et ${fullName(partner)} ? Les deux restent dans l'arbre.`,
+                      )
+                    )
+                      removeUnionPartner(u.id, partner.id)
+                  }}
+                >
+                  Retirer ce lien d'union
+                </button>
+              )}
             </div>
           )
         })}
+
+        <button className="relation-add" onClick={() => setPick({ kind: 'partner' })}>
+          + Ajouter un·e partenaire
+        </button>
+        {unions.length === 0 && (
+          <button className="relation-add" onClick={() => setPick({ kind: 'child' })}>
+            + Ajouter un enfant
+          </button>
+        )}
 
         <h3>Notes</h3>
         <textarea
@@ -152,18 +279,11 @@ export function EditPanel() {
           placeholder="Métier, anecdotes, sources…"
         />
 
-        <h3>Famille</h3>
-        <div className="relation-actions">
-          <button onClick={() => setPickFor('parents')} disabled={Boolean(person.famc)}>
-            {person.famc ? 'Parents déjà renseignés' : 'Ajouter ses parents'}
+        {person.id !== focalId && (
+          <button className="relation-add" onClick={() => setFocal(person.id)}>
+            Centrer l'arbre sur cette personne
           </button>
-          <button onClick={() => setPickFor('partner')}>Ajouter un·e partenaire</button>
-          <button onClick={() => setPickFor('child')}>Ajouter un enfant</button>
-          {person.id !== focalId && (
-            <button onClick={() => setFocal(person.id)}>Centrer l'arbre sur cette personne</button>
-          )}
-        </div>
-
+        )}
         <button
           className="btn-danger"
           onClick={() => {
@@ -174,14 +294,14 @@ export function EditPanel() {
         </button>
       </div>
 
-      {pickFor && (
+      {pick && pickerText && (
         <PersonPicker
-          title={PICKER_TEXT[pickFor].title}
-          createLabel={PICKER_TEXT[pickFor].createLabel}
-          persons={eligible(pickFor)}
-          onPick={(id) => linkExisting(pickFor, id)}
-          onCreate={() => linkExisting(pickFor)}
-          onClose={() => setPickFor(null)}
+          title={pickerText.title}
+          createLabel={pickerText.createLabel}
+          persons={eligible(pick.kind)}
+          onPick={(id) => doLink(id)}
+          onCreate={() => doLink()}
+          onClose={() => setPick(null)}
         />
       )}
     </aside>
