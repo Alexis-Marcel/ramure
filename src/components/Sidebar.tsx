@@ -11,7 +11,12 @@ export function Sidebar() {
   const persons = useMemo(() => {
     const q = query.trim().toLowerCase()
     return Object.values(tree.persons)
-      .filter((p) => !q || fullName(p).toLowerCase().includes(q))
+      .filter(
+        (p) =>
+          !q ||
+          fullName(p).toLowerCase().includes(q) ||
+          (p.marriedName ?? '').toLowerCase().includes(q),
+      )
       .sort((a, b) =>
         `${a.surname} ${a.givenName}`.localeCompare(`${b.surname} ${b.givenName}`, 'fr'),
       )
@@ -41,7 +46,10 @@ export function Sidebar() {
               onClick={() => setFocal(p.id)}
               title="Centrer l'arbre sur cette personne"
             >
-              <span className="person-name">{fullName(p)}</span>
+              <span className="person-name">
+                {fullName(p)}
+                {p.marriedName ? ` (${p.marriedName})` : ''}
+              </span>
               <span className="person-dates">{lifespan(p)}</span>
             </button>
           </li>

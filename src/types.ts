@@ -3,7 +3,10 @@ export type Sex = 'M' | 'F' | 'U'
 export interface Person {
   id: string
   givenName: string
+  /** nom de naissance (convention généalogique) */
   surname: string
+  /** nom d'usage — marital le plus souvent */
+  marriedName?: string
   sex: Sex
   birthDate?: string
   birthPlace?: string

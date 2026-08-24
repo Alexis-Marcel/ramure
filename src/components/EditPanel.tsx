@@ -131,8 +131,18 @@ export function EditPanel() {
       <div className="panel-body">
         <div className="field-row">
           <Field label="Prénom" value={person.givenName} onChange={(v) => set({ givenName: v })} />
-          <Field label="Nom" value={person.surname} onChange={(v) => set({ surname: v })} />
+          <Field
+            label="Nom de naissance"
+            value={person.surname}
+            onChange={(v) => set({ surname: v })}
+          />
         </div>
+        <Field
+          label="Nom d'usage (marital)"
+          value={person.marriedName ?? ''}
+          onChange={(v) => set({ marriedName: v || undefined })}
+          placeholder="si différent du nom de naissance"
+        />
         <label className="field">
           <span>Sexe</span>
           <select value={person.sex} onChange={(e) => set({ sex: e.target.value as Sex })}>

@@ -59,6 +59,27 @@ describe('gedcom', () => {
     expect(roundtrip.unions['@F1@'].divorceDate).toBe('2005')
   })
 
+  it('lit et réécrit le nom d’usage (TYPE married et _MARNM)', () => {
+    const ged = `
+0 @I1@ INDI
+1 NAME Camille /Dupont/
+2 _MARNM Durand
+0 @I2@ INDI
+1 NAME Louise /Martin/
+1 NAME Louise /Durand/
+2 TYPE married
+0 TRLR`
+    const tree = parseGedcom(ged)
+    expect(tree.persons['@I1@'].surname).toBe('Dupont')
+    expect(tree.persons['@I1@'].marriedName).toBe('Durand')
+    expect(tree.persons['@I2@'].surname).toBe('Martin')
+    expect(tree.persons['@I2@'].marriedName).toBe('Durand')
+    const roundtrip = parseGedcom(serializeGedcom(tree))
+    expect(roundtrip.persons['@I1@'].marriedName).toBe('Durand')
+    expect(roundtrip.persons['@I2@'].surname).toBe('Martin')
+    expect(roundtrip.persons['@I2@'].marriedName).toBe('Durand')
+  })
+
   it('ignore les lignes invalides sans planter', () => {
     const tree = parseGedcom('n importe quoi\n0 @I1@ INDI\n1 NAME Ada /Lovelace/\n???')
     expect(tree.persons['@I1@'].givenName).toBe('Ada')

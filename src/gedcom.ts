@@ -45,7 +45,8 @@ export function parseGedcom(text: string): Tree {
 
     if (line.tag === 'INDI' && line.xref) {
       const p: Person = { id: line.xref, givenName: '', surname: '', sex: 'U', fams: [] }
-      let context: 'BIRT' | 'DEAT' | null = null
+      let context: 'BIRT' | 'DEAT' | 'NAME' | null = null
+      let lastNameSurname = ''
       let noteLines: string[] = []
       for (const l of record) {
         if (l.level === 1) {
@@ -57,6 +58,8 @@ export function parseGedcom(text: string): Tree {
                 p.givenName = givenName
                 p.surname = surname
               }
+              context = 'NAME'
+              lastNameSurname = surname
               break
             }
             case 'SEX':
@@ -85,6 +88,14 @@ export function parseGedcom(text: string): Tree {
           } else if (context === 'DEAT') {
             if (l.tag === 'DATE') p.deathDate = l.value
             if (l.tag === 'PLAC') p.deathPlace = l.value
+          } else if (context === 'NAME') {
+            // nom d'usage : NAME + TYPE married (standard) ou _MARNM (MyHeritage…)
+            if (l.tag === 'TYPE' && l.value.trim().toLowerCase() === 'married' && lastNameSurname) {
+              p.marriedName = lastNameSurname
+            }
+            if (l.tag === '_MARNM') {
+              p.marriedName = l.value.replace(/\//g, '').trim()
+            }
           }
           if (l.tag === 'CONT') noteLines.push(l.value)
           if (l.tag === 'CONC' && noteLines.length > 0) {
@@ -159,6 +170,10 @@ export function serializeGedcom(tree: Tree): string {
   for (const p of Object.values(tree.persons)) {
     out.push(`0 ${p.id} INDI`)
     out.push(`1 NAME ${p.givenName} /${p.surname}/`)
+    if (p.marriedName) {
+      out.push(`1 NAME ${p.givenName} /${p.marriedName}/`)
+      out.push('2 TYPE married')
+    }
     if (p.sex !== 'U') out.push(`1 SEX ${p.sex}`)
     if (p.birthDate || p.birthPlace) {
       out.push('1 BIRT')
