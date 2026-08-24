@@ -652,6 +652,22 @@ button:focus-visible {
   color: var(--encre-2);
 }
 
+.picker-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.card-add circle:first-of-type {
+  transition: fill 0.12s;
+}
+
+.card-add:hover circle:first-of-type {
+  fill: var(--accent-pale);
+}
+
 .loading {
   flex: 1;
   display: grid;

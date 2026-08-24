@@ -34,7 +34,9 @@ export default function App() {
   const select = useStore((s) => s.select)
   const setFocal = useStore((s) => s.setFocal)
   const setTree = useStore((s) => s.setTree)
-  const addPerson = useStore((s) => s.addPerson)
+  const addParents = useStore((s) => s.addParents)
+  const addPartner = useStore((s) => s.addPartner)
+  const addChild = useStore((s) => s.addChild)
 
   const hydrated = useStore((s) => s.hydrated)
   // la modale s'ouvre d'emblée quand on arrive par un lien d'invitation inconnu
@@ -115,7 +117,6 @@ export default function App() {
           )
         }
         onExportHtml={handleExportHtml}
-        onAddPerson={() => addPerson()}
         onCollab={() => setCollabOpen(true)}
       />
       <div className="workspace">
@@ -129,6 +130,7 @@ export default function App() {
             selectedId={selectedId}
             onSelect={select}
             onFocus={setFocal}
+            actions={{ onAddParents: addParents, onAddPartner: addPartner, onAddChild: addChild }}
           />
         ) : (
           <EmptyState onImport={handleImport} />

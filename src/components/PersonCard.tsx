@@ -32,18 +32,56 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s
 }
 
+export interface CardActions {
+  onAddParents: (id: string) => void
+  onAddPartner: (id: string) => void
+  onAddChild: (id: string) => void
+}
+
+/** Bouton « + » fantôme accolé à la fiche sélectionnée. */
+function AddButton({
+  cx,
+  cy,
+  label,
+  onClick,
+}: {
+  cx: number
+  cy: number
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <g
+      className="card-add"
+      transform={`translate(${cx}, ${cy})`}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      style={{ cursor: 'pointer' }}
+    >
+      <title>{label}</title>
+      <circle r={13} fill="#FFFFFF" stroke="#17A673" strokeWidth={1.5} />
+      <path d="M -5 0 H 5 M 0 -5 V 5" stroke="#17A673" strokeWidth={2} strokeLinecap="round" />
+    </g>
+  )
+}
+
 interface Props {
   node: LayoutNode
   selected: boolean
   onSelect: (id: string) => void
   onFocus: (id: string) => void
+  /** absent dans l'export HTML statique */
+  actions?: CardActions
 }
 
 /**
  * Tout le style est porté en attributs inline pour que l'export HTML
  * autonome reste fidèle sans feuille de style.
  */
-export function PersonCard({ node, selected, onSelect, onFocus }: Props) {
+export function PersonCard({ node, selected, onSelect, onFocus, actions }: Props) {
   const { person, x, y, isFocal } = node
   const name = truncate(fullName(person), 20)
   const dates = truncate(lifespan(person), 26)
@@ -107,6 +145,30 @@ export function PersonCard({ node, selected, onSelect, onFocus }: Props) {
         <text x={58} y={55} fontFamily={UI_FONT} fontSize={10.5} fill="#9AA396">
           {place}
         </text>
+      )}
+      {selected && actions && (
+        <>
+          {!person.famc && (
+            <AddButton
+              cx={CARD_W / 2}
+              cy={-20}
+              label="Ajouter ses parents"
+              onClick={() => actions.onAddParents(person.id)}
+            />
+          )}
+          <AddButton
+            cx={CARD_W + 20}
+            cy={CARD_H / 2}
+            label="Ajouter un·e partenaire"
+            onClick={() => actions.onAddPartner(person.id)}
+          />
+          <AddButton
+            cx={CARD_W / 2}
+            cy={CARD_H + 20}
+            label="Ajouter un enfant"
+            onClick={() => actions.onAddChild(person.id)}
+          />
+        </>
       )}
     </g>
   )

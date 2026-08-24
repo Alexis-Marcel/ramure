@@ -24,9 +24,12 @@ interface State {
   addPerson: (fields?: Partial<Person>) => string
   updatePerson: (id: string, fields: Partial<Person>) => void
   deletePerson: (id: string) => void
-  addParents: (childId: string) => void
-  addPartner: (personId: string) => void
-  addChild: (personId: string) => void
+  /** Relie un parent existant, ou crée les deux parents si existingId est absent. */
+  addParents: (childId: string, existingId?: string) => void
+  /** Relie un·e partenaire existant·e, ou en crée un·e si existingId est absent. */
+  addPartner: (personId: string, existingId?: string) => void
+  /** Relie un enfant existant (sans parents connus), ou en crée un si existingId est absent. */
+  addChild: (personId: string, existingId?: string) => void
   updateUnion: (id: string, fields: Partial<Union>) => void
   loadSample: () => void
   clearAll: () => void
@@ -95,31 +98,55 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    addParents: (childId) => {
+    addParents: (childId, existingId) => {
       commit((tree) => {
         const child = tree.persons[childId]
         if (!child || child.famc) return
-        const fatherId = randomId('I')
-        const motherId = randomId('I')
         const unionId = randomId('F')
-        tree.persons[fatherId] = {
-          id: fatherId,
-          givenName: '',
-          surname: child.surname,
-          sex: 'M',
-          fams: [unionId],
+        if (existingId && tree.persons[existingId]) {
+          tree.unions[unionId] = { id: unionId, partners: [existingId], children: [childId] }
+        } else {
+          const fatherId = randomId('I')
+          const motherId = randomId('I')
+          tree.persons[fatherId] = {
+            id: fatherId,
+            givenName: '',
+            surname: child.surname,
+            sex: 'M',
+            fams: [unionId],
+          }
+          tree.persons[motherId] = {
+            id: motherId,
+            givenName: '',
+            surname: '',
+            sex: 'F',
+            fams: [unionId],
+          }
+          tree.unions[unionId] = { id: unionId, partners: [fatherId, motherId], children: [childId] }
         }
-        tree.persons[motherId] = { id: motherId, givenName: '', surname: '', sex: 'F', fams: [unionId] }
-        tree.unions[unionId] = { id: unionId, partners: [fatherId, motherId], children: [childId] }
         child.famc = unionId
       })
     },
 
-    addPartner: (personId) => {
-      let partnerId = ''
+    addPartner: (personId, existingId) => {
+      let partnerId = existingId ?? ''
       commit((tree) => {
         const p = tree.persons[personId]
         if (!p) return
+        if (existingId) {
+          if (!tree.persons[existingId] || existingId === personId) return
+          // déjà en couple ensemble : rien à faire
+          if (p.fams.some((u) => tree.unions[u]?.partners.includes(existingId))) return
+          // une union monoparentale existante se complète plutôt que d'en créer une seconde
+          const single = p.fams.find((u) => tree.unions[u]?.partners.length === 1)
+          if (single) {
+            tree.unions[single].partners.push(existingId)
+            return
+          }
+          const unionId = randomId('F')
+          tree.unions[unionId] = { id: unionId, partners: [personId, existingId], children: [] }
+          return
+        }
         partnerId = randomId('I')
         const unionId = randomId('F')
         const sex = p.sex === 'M' ? 'F' : p.sex === 'F' ? 'M' : 'U'
@@ -130,16 +157,25 @@ export const useStore = create<State>((set, get) => {
       if (partnerId) set({ selectedId: partnerId })
     },
 
-    addChild: (personId) => {
-      let childId = ''
+    addChild: (personId, existingId) => {
+      let childId = existingId ?? ''
       commit((tree) => {
         const p = tree.persons[personId]
         if (!p) return
+        if (existingId) {
+          const child = tree.persons[existingId]
+          if (!child || child.famc || existingId === personId) return
+        }
         let unionId = p.fams[0]
         if (!unionId) {
           unionId = randomId('F')
           tree.unions[unionId] = { id: unionId, partners: [personId], children: [] }
           p.fams.push(unionId)
+        }
+        if (existingId) {
+          tree.persons[existingId].famc = unionId
+          tree.unions[unionId].children.push(existingId)
+          return
         }
         childId = randomId('I')
         tree.persons[childId] = {

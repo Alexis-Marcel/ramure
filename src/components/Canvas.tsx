@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TreeLayout } from '../layout'
+import type { CardActions } from './PersonCard'
 import { TreeSvg } from './TreeSvg'
 
 interface ViewBox {
@@ -15,6 +16,7 @@ interface Props {
   selectedId: string | null
   onSelect: (id: string | null) => void
   onFocus: (id: string) => void
+  actions: CardActions
 }
 
 function fitViewBox(layout: TreeLayout, aspect: number): ViewBox {
@@ -29,7 +31,7 @@ function fitViewBox(layout: TreeLayout, aspect: number): ViewBox {
   return { x: cx - w / 2, y: cy - h / 2, w, h }
 }
 
-export function Canvas({ layout, focalId, selectedId, onSelect, onFocus }: Props) {
+export function Canvas({ layout, focalId, selectedId, onSelect, onFocus, actions }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [vb, setVb] = useState<ViewBox>({ x: -600, y: -400, w: 1200, h: 800 })
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null)
@@ -122,6 +124,7 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus }: Props
           selectedId={selectedId}
           onSelect={onSelect}
           onFocus={onFocus}
+          actions={actions}
         />
       </svg>
       <div className="zoom-controls" role="group" aria-label="Zoom">

@@ -6,7 +6,6 @@ interface Props {
   onExportGedcom: () => void
   onExportJson: () => void
   onExportHtml: () => void
-  onAddPerson: () => void
   onCollab: () => void
 }
 
@@ -16,7 +15,6 @@ export function TopBar({
   onExportGedcom,
   onExportJson,
   onExportHtml,
-  onAddPerson,
   onCollab,
 }: Props) {
   const { status, peers } = useSync()
@@ -60,9 +58,6 @@ export function TopBar({
             </button>
           </div>
         </details>
-        <button className="btn btn-primary" onClick={onAddPerson}>
-          + Nouvelle personne
-        </button>
       </div>
     </header>
   )

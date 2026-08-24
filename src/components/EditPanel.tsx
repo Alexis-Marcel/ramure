@@ -1,6 +1,17 @@
+import { useState } from 'react'
+import { collectAncestors, collectDescendants } from '../relatives'
 import { useStore } from '../store'
 import { fullName } from '../types'
 import type { Person, Sex } from '../types'
+import { PersonPicker } from './PersonPicker'
+
+type PickKind = 'parents' | 'partner' | 'child'
+
+const PICKER_TEXT: Record<PickKind, { title: string; createLabel: string }> = {
+  parents: { title: 'Relier un parent', createLabel: 'Créer ses deux parents' },
+  partner: { title: 'Relier un·e partenaire', createLabel: 'Créer un·e nouveau·elle partenaire' },
+  child: { title: 'Relier un enfant', createLabel: 'Créer un nouvel enfant' },
+}
 
 function Field({
   label,
@@ -34,11 +45,35 @@ export function EditPanel() {
   const addPartner = useStore((s) => s.addPartner)
   const addChild = useStore((s) => s.addChild)
 
+  const [pickFor, setPickFor] = useState<PickKind | null>(null)
+
   const person: Person | undefined = selectedId ? tree.persons[selectedId] : undefined
   if (!person) return null
 
   const set = (fields: Partial<Person>) => updatePerson(person.id, fields)
   const unions = person.fams.map((id) => tree.unions[id]).filter(Boolean)
+
+  /** Personnes reliables pour chaque type de lien (sans créer d'incohérence). */
+  const eligible = (kind: PickKind): Person[] => {
+    const ancestors = collectAncestors(tree, person.id)
+    const descendants = collectDescendants(tree, person.id)
+    const partners = new Set(
+      unions.flatMap((u) => u.partners).filter((id) => id !== person.id),
+    )
+    return Object.values(tree.persons).filter((p) => {
+      if (p.id === person.id || ancestors.has(p.id) || descendants.has(p.id) || partners.has(p.id))
+        return false
+      if (kind === 'child' && p.famc) return false
+      return true
+    })
+  }
+
+  const linkExisting = (kind: PickKind, id?: string) => {
+    if (kind === 'parents') addParents(person.id, id)
+    if (kind === 'partner') addPartner(person.id, id)
+    if (kind === 'child') addChild(person.id, id)
+    setPickFor(null)
+  }
 
   return (
     <aside className="edit-panel">
@@ -119,11 +154,11 @@ export function EditPanel() {
 
         <h3>Famille</h3>
         <div className="relation-actions">
-          <button onClick={() => addParents(person.id)} disabled={Boolean(person.famc)}>
+          <button onClick={() => setPickFor('parents')} disabled={Boolean(person.famc)}>
             {person.famc ? 'Parents déjà renseignés' : 'Ajouter ses parents'}
           </button>
-          <button onClick={() => addPartner(person.id)}>Ajouter un·e partenaire</button>
-          <button onClick={() => addChild(person.id)}>Ajouter un enfant</button>
+          <button onClick={() => setPickFor('partner')}>Ajouter un·e partenaire</button>
+          <button onClick={() => setPickFor('child')}>Ajouter un enfant</button>
           {person.id !== focalId && (
             <button onClick={() => setFocal(person.id)}>Centrer l'arbre sur cette personne</button>
           )}
@@ -138,6 +173,17 @@ export function EditPanel() {
           Supprimer cette personne
         </button>
       </div>
+
+      {pickFor && (
+        <PersonPicker
+          title={PICKER_TEXT[pickFor].title}
+          createLabel={PICKER_TEXT[pickFor].createLabel}
+          persons={eligible(pickFor)}
+          onPick={(id) => linkExisting(pickFor, id)}
+          onCreate={() => linkExisting(pickFor)}
+          onClose={() => setPickFor(null)}
+        />
+      )}
     </aside>
   )
 }

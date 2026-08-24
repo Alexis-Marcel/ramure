@@ -1,15 +1,17 @@
 import type { TreeLayout } from '../layout'
-import { PersonCard } from './PersonCard'
+import { PersonCard, type CardActions } from './PersonCard'
 
 interface Props {
   layout: TreeLayout
   selectedId: string | null
   onSelect: (id: string) => void
   onFocus: (id: string) => void
+  /** absent dans l'export HTML statique */
+  actions?: CardActions
 }
 
 /** Contenu SVG pur de l'arbre — partagé entre le canevas et l'export HTML. */
-export function TreeSvg({ layout, selectedId, onSelect, onFocus }: Props) {
+export function TreeSvg({ layout, selectedId, onSelect, onFocus, actions }: Props) {
   return (
     <g id="ramure-world">
       <defs>
@@ -46,6 +48,7 @@ export function TreeSvg({ layout, selectedId, onSelect, onFocus }: Props) {
           selected={node.person.id === selectedId}
           onSelect={onSelect}
           onFocus={onFocus}
+          actions={actions}
         />
       ))}
     </g>
