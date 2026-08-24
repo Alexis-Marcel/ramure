@@ -174,6 +174,11 @@ export function Canvas({ layout, focalId, selectedId, onSelect, onFocus, actions
           actions={actions}
         />
       </svg>
+      <div className="canvas-legend" aria-hidden="true">
+        <span className="legend-square" /> homme
+        <span className="legend-circle" /> femme
+        <span className="legend-diamond" /> non renseigné
+      </div>
       <div className="zoom-controls" role="group" aria-label="Zoom">
         <button onClick={() => zoomAt(1 / 1.3)} aria-label="Zoomer" title="Zoomer">
           +

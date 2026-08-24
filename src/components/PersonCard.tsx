@@ -112,7 +112,22 @@ export function PersonCard({ node, selected, onSelect, onFocus, actions }: Props
         strokeWidth={active ? 2 : 1}
         filter="url(#card-shadow)"
       />
-      <circle cx={32} cy={CARD_H / 2} r={17} fill={avBg} />
+      {/* convention généalogique : carré = homme, cercle = femme, losange = non renseigné */}
+      {person.sex === 'M' ? (
+        <rect x={15} y={CARD_H / 2 - 17} width={34} height={34} rx={9} fill={avBg} />
+      ) : person.sex === 'F' ? (
+        <circle cx={32} cy={CARD_H / 2} r={17} fill={avBg} />
+      ) : (
+        <rect
+          x={19}
+          y={CARD_H / 2 - 13}
+          width={26}
+          height={26}
+          rx={6}
+          fill={avBg}
+          transform={`rotate(45 32 ${CARD_H / 2})`}
+        />
+      )}
       <text
         x={32}
         y={CARD_H / 2}
@@ -125,16 +140,33 @@ export function PersonCard({ node, selected, onSelect, onFocus, actions }: Props
       >
         {initials(person.givenName, person.surname)}
       </text>
-      {isFocal && (
-        <circle
-          cx={32}
-          cy={CARD_H / 2}
-          r={20.5}
-          fill="none"
-          stroke="#17A673"
-          strokeWidth={2}
-        />
-      )}
+      {isFocal &&
+        (person.sex === 'M' ? (
+          <rect
+            x={11}
+            y={CARD_H / 2 - 21}
+            width={42}
+            height={42}
+            rx={12}
+            fill="none"
+            stroke="#17A673"
+            strokeWidth={2}
+          />
+        ) : person.sex === 'F' ? (
+          <circle cx={32} cy={CARD_H / 2} r={21} fill="none" stroke="#17A673" strokeWidth={2} />
+        ) : (
+          <rect
+            x={15}
+            y={CARD_H / 2 - 17}
+            width={34}
+            height={34}
+            rx={8}
+            fill="none"
+            stroke="#17A673"
+            strokeWidth={2}
+            transform={`rotate(45 32 ${CARD_H / 2})`}
+          />
+        ))}
       <text
         x={58}
         y={dates && place ? 25 : dates || place ? 29 : CARD_H / 2 + 5}
