@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   currentSpace,
+  detectSameOriginServer,
   inviteLink,
   joinSpace,
   leaveSpace,
@@ -23,7 +24,15 @@ export function CollabPanel({ onClose }: { onClose: () => void }) {
   const [space, setSpace] = useState<Space | null>(currentSpace())
   const [name, setName] = useState(loadUiPrefs().name ?? '')
   const [server, setServer] = useState(space?.server ?? '')
+  const [localServer, setLocalServer] = useState<string | null>(null)
+  const [otherServer, setOtherServer] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    detectSameOriginServer().then(setLocalServer)
+  }, [])
+
+  const effectiveServer = localServer && !otherServer ? localServer : server.trim()
 
   const join = (s: Space) => {
     joinSpace(s, name.trim() || 'Sans nom')
@@ -64,23 +73,36 @@ export function CollabPanel({ onClose }: { onClose: () => void }) {
               <p className="hint">
                 Un espace famille synchronise l'arbre entre tous ses membres, en direct ou en
                 décalé, via votre propre serveur — vos données ne passent par aucun service tiers.
-                Le serveur s'installe en un conteneur Docker (voir le README du projet).
               </p>
-              <label className="field">
-                <span>Adresse de votre serveur</span>
-                <input
-                  value={server}
-                  onChange={(e) => setServer(e.target.value)}
-                  placeholder="https://ramure.mondomaine.fr"
-                  inputMode="url"
-                />
-              </label>
+              {localServer && !otherServer ? (
+                <p className="hint">
+                  Synchronisation via ce site : <code>{localServer}</code>{' '}
+                  <button className="link" onClick={() => setOtherServer(true)}>
+                    utiliser un autre serveur
+                  </button>
+                </p>
+              ) : (
+                <label className="field">
+                  <span>Adresse de votre serveur</span>
+                  <input
+                    value={server}
+                    onChange={(e) => setServer(e.target.value)}
+                    placeholder="https://ramure.mondomaine.fr"
+                    inputMode="url"
+                  />
+                  {!localServer && (
+                    <span className="hint">
+                      Le serveur s'installe en un conteneur Docker — voir le README du projet.
+                    </span>
+                  )}
+                </label>
+              )}
               <button
                 className="btn btn-primary"
-                disabled={!server.trim()}
+                disabled={!effectiveServer}
                 onClick={() => {
                   try {
-                    join({ server: new URL(server.trim()).toString(), space: randomSpaceId() })
+                    join({ server: new URL(effectiveServer).toString(), space: randomSpaceId() })
                   } catch {
                     alert('Cette adresse de serveur ne semble pas valide.')
                   }

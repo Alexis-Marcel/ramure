@@ -117,6 +117,24 @@ function wsUrl(server: string): string {
   return url.toString()
 }
 
+/**
+ * Détecte si l'app est servie par un serveur Ramure (image Docker) : dans ce
+ * cas l'adresse du serveur de sync est celle du site lui-même, inutile de la
+ * demander. La version GitHub Pages, elle, répond 404 sur /health.
+ */
+export async function detectSameOriginServer(): Promise<string | null> {
+  try {
+    const res = await fetch(new URL('health', location.href), { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data?.status !== 'ok') return null
+    const base = new URL('.', location.href)
+    return (base.origin + base.pathname).replace(/\/$/, '')
+  } catch {
+    return null
+  }
+}
+
 export function currentSpace(): Space | null {
   try {
     return JSON.parse(localStorage.getItem(SPACE_KEY) ?? 'null')
