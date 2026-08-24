@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const MONTHS = [
   'janvier',
@@ -37,8 +37,9 @@ function parseParts(value: string): Parts | null {
   return { day: m[1] ?? '', month, year: m[3] }
 }
 
+/** N'émet une date que lorsque l'année est complète (3 ou 4 chiffres). */
 function formatParts({ day, month, year }: Parts): string {
-  if (!year) return ''
+  if (!/^\d{3,4}$/.test(year)) return ''
   const monthName = month ? MONTHS[Number(month) - 1] : ''
   return [monthName && day ? day : '', monthName, year].filter(Boolean).join(' ')
 }
@@ -53,28 +54,47 @@ interface Props {
  * Date généalogique : jour, mois et année séparés, tous optionnels sauf
  * l'année — on connaît rarement une date complète. Une valeur existante non
  * reconnue (« vers 1780 »…) reste éditable en texte libre.
+ *
+ * L'état vit dans le composant pendant la saisie : la valeur émise (souvent
+ * incomplète au fil des frappes) ne re-pilote pas l'affichage. Seule une
+ * modification venue d'ailleurs (autre fiche, synchronisation) resynchronise.
  */
 export function DateField({ label, value, onChange }: Props) {
-  const parsed = parseParts(value)
-  const [freeText, setFreeText] = useState(parsed === null)
+  const lastEmitted = useRef<string | null>(null)
+  const [parts, setParts] = useState<Parts | null>(() => parseParts(value))
 
-  if (freeText || parsed === null) {
+  useEffect(() => {
+    if (value === lastEmitted.current) return
+    lastEmitted.current = null
+    setParts(parseParts(value))
+  }, [value])
+
+  const emitParts = (next: Parts) => {
+    setParts(next)
+    const out = formatParts(next)
+    lastEmitted.current = out
+    onChange(out)
+  }
+
+  if (parts === null) {
     return (
       <label className="field">
         <span>{label}</span>
         <input
           value={value}
           onChange={(e) => {
+            lastEmitted.current = e.target.value
             onChange(e.target.value)
-            if (parseParts(e.target.value) !== null) setFreeText(false)
+          }}
+          onBlur={() => {
+            const p = parseParts(value)
+            if (p !== null) setParts(p)
           }}
           placeholder="vers 1780…"
         />
       </label>
     )
   }
-
-  const update = (parts: Partial<Parts>) => onChange(formatParts({ ...parsed, ...parts }))
 
   return (
     <div className="field">
@@ -86,16 +106,18 @@ export function DateField({ label, value, onChange }: Props) {
           placeholder="JJ"
           maxLength={2}
           aria-label={`${label} — jour`}
-          value={parsed.day}
-          disabled={!parsed.month}
-          onChange={(e) => update({ day: e.target.value.replace(/\D/g, '') })}
+          value={parts.day}
+          disabled={!parts.month}
+          onChange={(e) => emitParts({ ...parts, day: e.target.value.replace(/\D/g, '') })}
         />
         <select
           className="date-month"
           aria-label={`${label} — mois`}
-          value={parsed.month}
-          disabled={!parsed.year}
-          onChange={(e) => update({ month: e.target.value, day: e.target.value ? parsed.day : '' })}
+          value={parts.month}
+          disabled={!parts.year}
+          onChange={(e) =>
+            emitParts({ ...parts, month: e.target.value, day: e.target.value ? parts.day : '' })
+          }
         >
           <option value="">mois —</option>
           {MONTHS.map((m, i) => (
@@ -110,10 +132,10 @@ export function DateField({ label, value, onChange }: Props) {
           placeholder="AAAA"
           maxLength={4}
           aria-label={`${label} — année`}
-          value={parsed.year}
+          value={parts.year}
           onChange={(e) => {
             const year = e.target.value.replace(/\D/g, '')
-            onChange(formatParts({ day: parsed.day, month: year ? parsed.month : '', year }))
+            emitParts({ ...parts, year, month: year ? parts.month : '', day: year ? parts.day : '' })
           }}
         />
       </div>
