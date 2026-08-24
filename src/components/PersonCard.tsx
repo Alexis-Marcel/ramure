@@ -135,14 +135,23 @@ export function PersonCard({ node, selected, onSelect, onFocus, actions }: Props
           strokeWidth={2}
         />
       )}
-      <text x={58} y={person.birthPlace ? 25 : 29} fontFamily={UI_FONT} fontSize={13.5} fontWeight={600} fill="#17211B">
+      <text
+        x={58}
+        y={dates && place ? 25 : dates || place ? 29 : CARD_H / 2 + 5}
+        fontFamily={UI_FONT}
+        fontSize={13.5}
+        fontWeight={600}
+        fill="#17211B"
+      >
         {name}
       </text>
-      <text x={58} y={person.birthPlace ? 41 : 47} fontFamily={UI_FONT} fontSize={11} fill="#6B7469">
-        {dates || 'dates inconnues'}
-      </text>
+      {dates && (
+        <text x={58} y={place ? 41 : 47} fontFamily={UI_FONT} fontSize={11} fill="#6B7469">
+          {dates}
+        </text>
+      )}
       {place && (
-        <text x={58} y={55} fontFamily={UI_FONT} fontSize={10.5} fill="#9AA396">
+        <text x={58} y={dates ? 55 : 47} fontFamily={UI_FONT} fontSize={10.5} fill="#9AA396">
           {place}
         </text>
       )}

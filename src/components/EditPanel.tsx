@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DateField } from './DateField'
 import { collectAncestors, collectDescendants } from '../relatives'
 import { useStore } from '../store'
 import { fullName, lifespan } from '../types'
@@ -154,11 +155,10 @@ export function EditPanel() {
 
         <h3>Naissance</h3>
         <div className="field-row">
-          <Field
+          <DateField
             label="Date"
             value={person.birthDate ?? ''}
             onChange={(v) => set({ birthDate: v })}
-            placeholder="12 mars 1902"
           />
           <Field
             label="Lieu"
@@ -169,7 +169,11 @@ export function EditPanel() {
 
         <h3>Décès</h3>
         <div className="field-row">
-          <Field label="Date" value={person.deathDate ?? ''} onChange={(v) => set({ deathDate: v })} />
+          <DateField
+            label="Date"
+            value={person.deathDate ?? ''}
+            onChange={(v) => set({ deathDate: v })}
+          />
           <Field
             label="Lieu"
             value={person.deathPlace ?? ''}
@@ -177,33 +181,37 @@ export function EditPanel() {
           />
         </div>
 
-        <h3>Parents</h3>
-        {parents.length > 0 && (
-          <ul className="link-list">
-            {parents.map((pp) => (
-              <LinkRow
-                key={pp.id}
-                person={pp}
-                onOpen={() => select(pp.id)}
-                unlinkLabel="Retirer ce lien de parenté"
-                onUnlink={() => {
-                  if (
-                    famcUnion &&
-                    confirm(
-                      `Retirer ${fullName(pp)} des parents de ${fullName(person)} ? La personne reste dans l'arbre.`,
+        <h3>Famille</h3>
+
+        <div className="family-block">
+          <div className="family-head">Parents</div>
+          {parents.length > 0 && (
+            <ul className="link-list">
+              {parents.map((pp) => (
+                <LinkRow
+                  key={pp.id}
+                  person={pp}
+                  onOpen={() => select(pp.id)}
+                  unlinkLabel="Retirer ce lien de parenté"
+                  onUnlink={() => {
+                    if (
+                      famcUnion &&
+                      confirm(
+                        `Retirer ${fullName(pp)} des parents de ${fullName(person)} ? La personne reste dans l'arbre.`,
+                      )
                     )
-                  )
-                    removeUnionPartner(famcUnion.id, pp.id)
-                }}
-              />
-            ))}
-          </ul>
-        )}
-        {parents.length < 2 && (
-          <button className="relation-add" onClick={() => setPick({ kind: 'parents' })}>
-            {parents.length === 1 ? "+ Ajouter l'autre parent" : '+ Ajouter ses parents'}
-          </button>
-        )}
+                      removeUnionPartner(famcUnion.id, pp.id)
+                  }}
+                />
+              ))}
+            </ul>
+          )}
+          {parents.length < 2 && (
+            <button className="relation-add" onClick={() => setPick({ kind: 'parents' })}>
+              {parents.length === 1 ? "+ Ajouter l'autre parent" : '+ Ajouter ses parents'}
+            </button>
+          )}
+        </div>
 
         {unions.map((u) => {
           const partner = u.partners
@@ -213,13 +221,32 @@ export function EditPanel() {
             .map((c) => tree.persons[c])
             .filter((c): c is Person => Boolean(c))
           return (
-            <div key={u.id} className="union-block">
-              <h3>
-                {partner ? `Union avec ${fullName(partner)}` : 'Union'}
-                {(u.separated || u.divorceDate) && ' · séparés'}
-              </h3>
+            <div key={u.id} className="family-block">
+              <div className="family-head">
+                <span>
+                  {partner ? `Union · ${fullName(partner)}` : 'Union'}
+                  {(u.separated || u.divorceDate) && ' · séparés'}
+                </span>
+                {partner && (
+                  <button
+                    className="unlink"
+                    title="Retirer ce lien d'union"
+                    aria-label="Retirer ce lien d'union"
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Retirer le lien entre ${fullName(person)} et ${fullName(partner)} ? Les deux restent dans l'arbre.`,
+                        )
+                      )
+                        removeUnionPartner(u.id, partner.id)
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
               <div className="field-row">
-                <Field
+                <DateField
                   label="Date"
                   value={u.marriageDate ?? ''}
                   onChange={(v) => updateUnion(u.id, { marriageDate: v })}
@@ -244,31 +271,36 @@ export function EditPanel() {
                 <span>Séparés ou divorcés</span>
               </label>
               {(u.separated || u.divorceDate) && (
-                <Field
+                <DateField
                   label="Date de séparation"
                   value={u.divorceDate ?? ''}
                   onChange={(v) => updateUnion(u.id, { divorceDate: v })}
                 />
               )}
               {children.length > 0 && (
-                <ul className="link-list">
-                  {children.map((c) => (
-                    <LinkRow
-                      key={c.id}
-                      person={c}
-                      onOpen={() => select(c.id)}
-                      unlinkLabel="Retirer cet enfant de l'union"
-                      onUnlink={() => {
-                        if (
-                          confirm(
-                            `Retirer ${fullName(c)} des enfants de cette union ? La personne reste dans l'arbre.`,
+                <>
+                  <div className="family-sub">
+                    Enfant{children.length > 1 ? 's' : ''} ({children.length})
+                  </div>
+                  <ul className="link-list">
+                    {children.map((c) => (
+                      <LinkRow
+                        key={c.id}
+                        person={c}
+                        onOpen={() => select(c.id)}
+                        unlinkLabel="Retirer cet enfant de l'union"
+                        onUnlink={() => {
+                          if (
+                            confirm(
+                              `Retirer ${fullName(c)} des enfants de cette union ? La personne reste dans l'arbre.`,
+                            )
                           )
-                        )
-                          removeUnionChild(u.id, c.id)
-                      }}
-                    />
-                  ))}
-                </ul>
+                            removeUnionChild(u.id, c.id)
+                        }}
+                      />
+                    ))}
+                  </ul>
+                </>
               )}
               <button
                 className="relation-add"
@@ -276,21 +308,6 @@ export function EditPanel() {
               >
                 + Ajouter un enfant
               </button>
-              {partner && (
-                <button
-                  className="relation-add subtle"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `Retirer le lien entre ${fullName(person)} et ${fullName(partner)} ? Les deux restent dans l'arbre.`,
-                      )
-                    )
-                      removeUnionPartner(u.id, partner.id)
-                  }}
-                >
-                  Retirer ce lien d'union
-                </button>
-              )}
             </div>
           )
         })}
