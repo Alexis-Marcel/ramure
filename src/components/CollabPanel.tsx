@@ -13,6 +13,32 @@ import {
 } from '../collab'
 import { useSync } from './useSync'
 
+/** Copie robuste : l'API clipboard n'existe qu'en contexte sécurisé (HTTPS ou
+ * localhost) ; en HTTP local (accès direct par IP) on passe par la sélection. */
+async function copyText(text: string): Promise<boolean> {
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // refusé par le navigateur : on tente la méthode historique
+    }
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    ta.remove()
+    return ok
+  } catch {
+    return false
+  }
+}
+
 const STATUS_LABEL: Record<SyncStatus, string> = {
   off: 'hors connexion',
   connecting: 'connexion…',
@@ -26,7 +52,7 @@ export function CollabPanel({ onClose }: { onClose: () => void }) {
   const [server, setServer] = useState(space?.server ?? '')
   const [localServer, setLocalServer] = useState<string | null>(null)
   const [otherServer, setOtherServer] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'non' | 'ok' | 'manuel'>('non')
 
   useEffect(() => {
     detectSameOriginServer().then(setLocalServer)
@@ -136,16 +162,27 @@ export function CollabPanel({ onClose }: { onClose: () => void }) {
               <label className="field">
                 <span>Lien d'invitation — envoyez-le à la famille</span>
                 <div className="invite-row">
-                  <input readOnly value={inviteLink(space)} onFocus={(e) => e.target.select()} />
+                  <input
+                    id="invite-link"
+                    readOnly
+                    value={inviteLink(space)}
+                    onFocus={(e) => e.target.select()}
+                  />
                   <button
                     className="btn"
                     onClick={async () => {
-                      await navigator.clipboard.writeText(inviteLink(space))
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
+                      const ok = await copyText(inviteLink(space))
+                      if (!ok) {
+                        // en dernier recours : on sélectionne le lien pour un Ctrl+C manuel
+                        const input = document.getElementById('invite-link') as HTMLInputElement
+                        input?.focus()
+                        input?.select()
+                      }
+                      setCopied(ok ? 'ok' : 'manuel')
+                      setTimeout(() => setCopied('non'), 2500)
                     }}
                   >
-                    {copied ? 'Copié !' : 'Copier'}
+                    {copied === 'ok' ? 'Copié !' : copied === 'manuel' ? 'Ctrl+C pour copier' : 'Copier'}
                   </button>
                 </div>
               </label>
