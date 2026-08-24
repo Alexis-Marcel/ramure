@@ -60,6 +60,9 @@ button {
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--bord);
+  /* au-dessus du canvas et des panneaux, sinon le menu Exporter passe dessous */
+  position: relative;
+  z-index: 30;
 }
 
 .brand {
