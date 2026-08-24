@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { currentSpace, joinSpace, loadUiPrefs, spaceFromHash } from './collab'
 import { Canvas } from './components/Canvas'
+import { CollabPanel } from './components/CollabPanel'
 import { EditPanel } from './components/EditPanel'
 import { EmptyState } from './components/EmptyState'
 import { Sidebar } from './components/Sidebar'
@@ -33,6 +35,19 @@ export default function App() {
   const setFocal = useStore((s) => s.setFocal)
   const setTree = useStore((s) => s.setTree)
   const addPerson = useStore((s) => s.addPerson)
+
+  const hydrated = useStore((s) => s.hydrated)
+  // la modale s'ouvre d'emblée quand on arrive par un lien d'invitation inconnu
+  const [collabOpen, setCollabOpen] = useState(() => {
+    const fromLink = spaceFromHash()
+    return Boolean(fromLink && currentSpace()?.space !== fromLink.space)
+  })
+
+  // rejoint l'espace famille : celui du lien d'invitation, sinon celui mémorisé
+  useEffect(() => {
+    const space = spaceFromHash() ?? currentSpace()
+    if (space) joinSpace(space, loadUiPrefs().name ?? 'Sans nom')
+  }, [])
 
   const hasData = Object.keys(tree.persons).length > 0
   const layout = useMemo(
@@ -101,10 +116,13 @@ export default function App() {
         }
         onExportHtml={handleExportHtml}
         onAddPerson={() => addPerson()}
+        onCollab={() => setCollabOpen(true)}
       />
       <div className="workspace">
         <Sidebar />
-        {hasData ? (
+        {!hydrated ? (
+          <div className="loading">Ouverture de votre arbre…</div>
+        ) : hasData ? (
           <Canvas
             layout={layout}
             focalId={focalId}
@@ -117,6 +135,7 @@ export default function App() {
         )}
         <EditPanel />
       </div>
+      {collabOpen && <CollabPanel onClose={() => setCollabOpen(false)} />}
     </div>
   )
 }

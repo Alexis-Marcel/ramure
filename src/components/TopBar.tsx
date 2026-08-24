@@ -1,3 +1,5 @@
+import { useSync } from './useSync'
+
 interface Props {
   hasData: boolean
   onImport: () => void
@@ -5,6 +7,7 @@ interface Props {
   onExportJson: () => void
   onExportHtml: () => void
   onAddPerson: () => void
+  onCollab: () => void
 }
 
 export function TopBar({
@@ -14,7 +17,9 @@ export function TopBar({
   onExportJson,
   onExportHtml,
   onAddPerson,
+  onCollab,
 }: Props) {
+  const { status, peers } = useSync()
   return (
     <header className="topbar">
       <div className="brand">
@@ -31,6 +36,11 @@ export function TopBar({
         <span className="brand-tagline">votre arbre, chez vous</span>
       </div>
       <div className="topbar-actions">
+        <button className="btn" onClick={onCollab}>
+          <span className={`dot dot-${status}`} aria-hidden="true" />
+          Famille
+          {status === 'connected' && peers.length > 0 && ` (${peers.length + 1})`}
+        </button>
         <button className="btn" onClick={onImport}>
           Importer
         </button>

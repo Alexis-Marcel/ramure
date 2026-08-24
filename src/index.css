@@ -528,6 +528,134 @@ button:focus-visible {
   background: rgba(209, 72, 58, 0.06);
 }
 
+/* ---------- Espace famille ---------- */
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: 1px;
+  background: var(--encre-3);
+}
+
+.dot-connected {
+  background: var(--accent);
+}
+
+.dot-connecting {
+  background: #e0a63c;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(23, 33, 27, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal {
+  width: 100%;
+  max-width: 460px;
+  background: var(--carte);
+  border-radius: 18px;
+  box-shadow: var(--ombre-forte);
+  overflow: hidden;
+}
+
+.modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--bord);
+}
+
+.modal h2 {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.modal .close {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--encre-3);
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.modal .close:hover {
+  color: var(--encre);
+  background: var(--bg);
+}
+
+.modal-body {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-body .field input {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--encre);
+  width: 100%;
+}
+
+.hint {
+  font-size: 12.5px;
+  color: var(--encre-2);
+  line-height: 1.5;
+}
+
+.hint code {
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 11.5px;
+}
+
+.sync-status {
+  font-weight: 500;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+
+.sync-status .peers {
+  font-weight: 400;
+  color: var(--encre-2);
+}
+
+.invite-row {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--encre-2);
+}
+
+.loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--encre-3);
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 900px) {

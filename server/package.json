@@ -1,0 +1,19 @@
+{
+  "name": "ramure-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Serveur Ramure : sert l'application et synchronise les espaces famille (Yjs sur WebSocket, persistance LevelDB)",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "lib0": "^0.2.99",
+    "ws": "^8.18.0",
+    "y-leveldb": "^0.1.2",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.32"
+  }
+}
