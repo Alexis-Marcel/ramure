@@ -67,7 +67,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/alexis-marcel/ramure:latest
+            ghcr.io/alexis-marcel/ramure:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
