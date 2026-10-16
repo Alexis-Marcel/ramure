@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ROLE_LABEL, type TreeSummary } from '../api'
 import type { Account } from '../auth'
-import { forgetTreeCaches, peekLocalTree } from '../collab'
+import { clearLocalTree, forgetTreeCaches, localTreeImported, peekLocalTree } from '../collab'
 import type { Tree } from '../types'
 
 interface Props {
@@ -30,7 +30,9 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
         void forgetTreeCaches(list.map((t) => t.id))
       })
       .catch((e: Error) => !cancelled && setError(e.message))
-    peekLocalTree().then((t) => !cancelled && setLocal(Object.keys(t.persons).length > 0 ? t : null))
+    if (!localTreeImported()) {
+      peekLocalTree().then((t) => !cancelled && setLocal(Object.keys(t.persons).length > 0 ? t : null))
+    }
     return () => {
       cancelled = true
     }
@@ -41,6 +43,36 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
     setError(null)
     try {
       then(await api.createTree(name))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Propriétaire : supprime l'arbre pour tous (nom à retaper). Sinon : quitte l'arbre. */
+  const remove = async (t: TreeSummary) => {
+    if (t.role === 'owner') {
+      const typed = prompt(
+        `Supprimer « ${t.name} » définitivement, pour ses ${t.members} membre${t.members > 1 ? 's' : ''} ?\n` +
+          `Pense à exporter une sauvegarde avant. Pour confirmer, retape le nom de l'arbre :`,
+      )
+      if (typed === null) return
+      if (typed.trim() !== t.name) {
+        setError("Le nom ne correspond pas : l'arbre n'a pas été supprimé.")
+        return
+      }
+    } else if (!confirm(`Quitter « ${t.name} » ? Il faudra une nouvelle invitation pour y revenir.`)) {
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      if (t.role === 'owner') await api.deleteTree(t.id)
+      else await api.removeMember(t.id, me.id)
+      const rest = (trees ?? []).filter((x) => x.id !== t.id)
+      setTrees(rest)
+      await forgetTreeCaches(rest.map((x) => x.id))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -85,6 +117,16 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
           >
             Importer dans mon compte
           </button>
+          <button
+            className="link"
+            disabled={busy}
+            onClick={() => {
+              if (!confirm(`Effacer l'arbre de ce navigateur (${localCount} personne${localCount > 1 ? 's' : ''}) ? Il n'est pas dans ton compte : il sera perdu.`)) return
+              void clearLocalTree().then(() => setLocal(null))
+            }}
+          >
+            Effacer de ce navigateur
+          </button>
         </div>
       )}
 
@@ -96,7 +138,15 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
       )}
       <ul className="tree-list">
         {trees?.map((t) => (
-          <li key={t.id}>
+          <li key={t.id} className="tree-row">
+            <button
+              className="tree-remove"
+              disabled={busy}
+              onClick={() => void remove(t)}
+              title={t.role === 'owner' ? "Supprimer l'arbre" : "Quitter l'arbre"}
+            >
+              {t.role === 'owner' ? 'Supprimer' : 'Quitter'}
+            </button>
             <button className="tree-card" onClick={() => onOpen(t)}>
               <span className="tree-card-name">{t.name}</span>
               <span className="tree-card-meta">

@@ -957,6 +957,27 @@ button:focus-visible {
   gap: 8px;
 }
 
+.tree-row {
+  position: relative;
+}
+
+/* en haut à droite de la carte, discret jusqu'au survol */
+.tree-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--encre-3);
+}
+
+.tree-remove:hover:not(:disabled) {
+  color: var(--danger);
+  background: rgba(209, 72, 58, 0.08);
+}
+
 .tree-card {
   width: 100%;
   display: flex;
@@ -976,6 +997,7 @@ button:focus-visible {
 }
 
 .tree-card-name {
+  padding-right: 84px;
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 600;
