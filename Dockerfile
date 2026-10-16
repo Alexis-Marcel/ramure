@@ -13,7 +13,7 @@ WORKDIR /srv
 ENV NODE_ENV=production
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
-COPY server/index.mjs ./
+COPY server/index.mjs server/api.mjs server/auth.mjs server/meta.mjs ./
 COPY --from=build /app/dist ./public
 ENV PORT=8484 DATA_DIR=/data STATIC_DIR=/srv/public
 VOLUME /data

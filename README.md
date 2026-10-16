@@ -52,6 +52,19 @@ docker run -d --name ramure \
 - **Reverse proxy** (Nginx Proxy Manager, Traefik…) : pointez votre domaine vers le port du conteneur et **activez le support WebSocket**. Le HTTPS du proxy suffit, le serveur n'a rien à configurer.
 - `GET /health` répond `{"status":"ok"}` pour vos sondes.
 
+### Comptes (optionnel)
+
+Avec un fournisseur OIDC (Authentik, Keycloak…), Ramure passe en **mode comptes** : chacun a sa liste d'arbres, et chaque arbre ses membres avec un rôle — **propriétaire**, **éditeur** (modifie) ou **lecteur** (consulte). On invite par un lien (7 jours, révocable) qui ajoute la personne à l'arbre quand elle l'ouvre connectée ; retirer un membre coupe son accès immédiatement.
+
+| Variable | Rôle |
+| --- | --- |
+| `OIDC_ISSUER` | émetteur OIDC, ex. `https://auth.exemple.fr/application/o/ramure/` |
+| `OIDC_CLIENT_ID` | identifiant du client (public, PKCE) — aussi l'audience exigée des jetons |
+
+Côté fournisseur : un client **public** (code d'autorisation + PKCE), adresse de retour = la racine du site (`https://ramure.exemple.fr/`), portées `openid email profile`, et un `sub` stable (UUID). La connexion est silencieuse si le fournisseur partage le site de Ramure (même domaine parent) : déjà connecté chez lui, on l'est dans Ramure.
+
+En mode comptes, le serveur exige un jeton valide et l'appartenance à l'arbre pour toute synchro ; un lecteur ne peut rien modifier, même en trafiquant l'app ; les liens d'espace famille secrets ne donnent plus accès à rien. Les membres et invitations sont dans `ramure-meta.json` (dossier de données). À la déconnexion, les copies hors-ligne des arbres sont effacées de l'appareil. Sans ces variables, rien ne change : espaces famille à lien secret comme ci-dessous.
+
 ### Créer un espace famille
 
 Dans l'app : **Famille → adresse de votre serveur → Créer l'espace famille**, puis envoyez le lien d'invitation. Chaque membre garde une copie complète hors-ligne ; le serveur fusionne et mémorise les modifications, y compris celles faites pendant que les autres étaient déconnectés. L'identifiant secret de l'espace fait office de clé d'accès : ne partagez le lien qu'en privé.

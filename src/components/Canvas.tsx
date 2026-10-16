@@ -16,7 +16,8 @@ interface Props {
   selectedId: string | null
   onSelect: (id: string | null) => void
   onFocus: (id: string) => void
-  actions: CardActions
+  /** absent en lecture seule : pas de boutons d'ajout sur les fiches */
+  actions?: CardActions
 }
 
 function fitViewBox(layout: TreeLayout, aspect: number): ViewBox {
