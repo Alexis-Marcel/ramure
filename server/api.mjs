@@ -10,7 +10,7 @@ import { HttpError } from './meta.mjs'
  *   meta: import('./meta.mjs').MetaStore,
  *   verify: (token: string) => Promise<import('./meta.mjs').Account>,
  *   config: { issuer: string, clientId: string },
- *   onTreeDeleted?: (treeId: string) => void,
+ *   onTreeDeleted?: (treeId: string, tree: object, by: import('./meta.mjs').Account) => Promise<void> | void,
  *   onAccessChanged?: (treeId: string, userId: string) => void,
  * }} ctx
  */
@@ -24,9 +24,10 @@ export function createApi({ meta, verify, config, onTreeDeleted = () => {}, onAc
     [
       'DELETE',
       /^\/api\/trees\/([a-z0-9-]+)$/,
-      (user, [id]) => {
-        meta.deleteTree(id, user)
-        onTreeDeleted(id)
+      async (user, [id], body) => {
+        const tree = meta.deleteTree(id, user, body.confirm)
+        // on attend la mise en corbeille : l'arbre n'est effacé qu'une fois sa copie écrite
+        await onTreeDeleted(id, tree, user)
         return { ok: true }
       },
     ],
@@ -79,7 +80,7 @@ export function createApi({ meta, verify, config, onTreeDeleted = () => {}, onAc
         throw new HttpError(401, 'Connexion requise')
       }
       const params = url.pathname.match(route[1]).slice(1)
-      const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readJson(req)
+      const body = req.method === 'GET' ? {} : await readJson(req)
       send(res, 200, await route[2](user, params, body))
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 500

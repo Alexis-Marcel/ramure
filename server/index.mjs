@@ -16,7 +16,7 @@
  *    secrets ne donnent plus accès à rien.
  */
 import http from 'node:http'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { WebSocketServer } from 'ws'
 import * as Y from 'yjs'
@@ -53,9 +53,22 @@ const api =
     meta,
     verify,
     config: { issuer: OIDC_ISSUER, clientId: OIDC_CLIENT_ID },
-    onTreeDeleted: async (treeId) => {
-      const space = await spaces.get(treeId)
-      space?.closeConnections()
+    onTreeDeleted: async (treeId, tree, by) => {
+      // Corbeille d'abord : copie complète (contenu Yjs + membres) avant d'effacer quoi que ce soit.
+      // Restauration : node restaurer.mjs <fichier .json> (serveur arrêté).
+      const loaded = await spaces.get(treeId)
+      const doc = loaded ?? (await ldb.getYDoc(treeId))
+      const dir = join(DATA_DIR, 'corbeille')
+      mkdirSync(dir, { recursive: true })
+      const base = join(dir, `${treeId}-${new Date().toISOString().replace(/[:.]/g, '-')}`)
+      writeFileSync(`${base}.yjs`, Y.encodeStateAsUpdate(doc), { mode: 0o600 })
+      writeFileSync(
+        `${base}.json`,
+        JSON.stringify({ tree, deletedAt: new Date().toISOString(), deletedBy: by.id, persons: doc.getMap('persons').size }, null, 2),
+        { mode: 0o600 },
+      )
+      console.log(`arbre ${treeId} (« ${tree.name} ») supprimé par ${by.name} — copie : ${base}.json`)
+      loaded?.closeConnections()
       spaces.delete(treeId)
       await ldb.clearDocument(treeId)
     },

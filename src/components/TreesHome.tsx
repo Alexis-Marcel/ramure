@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ROLE_LABEL, type TreeSummary } from '../api'
 import type { Account } from '../auth'
 import { clearLocalTree, forgetTreeCaches, localTreeImported, peekLocalTree } from '../collab'
+import { confirmTreeDeletion } from '../confirm'
 import type { Tree } from '../types'
 
 interface Props {
@@ -52,23 +53,17 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
 
   /** Propriétaire : supprime l'arbre pour tous (nom à retaper). Sinon : quitte l'arbre. */
   const remove = async (t: TreeSummary) => {
+    let confirmName: string | null = null
     if (t.role === 'owner') {
-      const typed = prompt(
-        `Supprimer « ${t.name} » définitivement, pour ses ${t.members} membre${t.members > 1 ? 's' : ''} ?\n` +
-          `Pense à exporter une sauvegarde avant. Pour confirmer, retape le nom de l'arbre :`,
-      )
-      if (typed === null) return
-      if (typed.trim() !== t.name) {
-        setError("Le nom ne correspond pas : l'arbre n'a pas été supprimé.")
-        return
-      }
+      confirmName = confirmTreeDeletion(t)
+      if (confirmName === null) return
     } else if (!confirm(`Quitter « ${t.name} » ? Il faudra une nouvelle invitation pour y revenir.`)) {
       return
     }
     setBusy(true)
     setError(null)
     try {
-      if (t.role === 'owner') await api.deleteTree(t.id)
+      if (t.role === 'owner') await api.deleteTree(t.id, confirmName ?? '')
       else await api.removeMember(t.id, me.id)
       const rest = (trees ?? []).filter((x) => x.id !== t.id)
       setTrees(rest)
