@@ -80,9 +80,17 @@ describe('MetaStore', () => {
   it("supprimer un arbre supprime ses invitations", () => {
     const { meta, id } = setup()
     const inv = meta.createInvite(id, alice, 'viewer')
-    meta.deleteTree(id, alice)
+    meta.deleteTree(id, alice, 'Famille')
     expect(meta.listTrees(alice)).toEqual([])
     expect(() => meta.describeInvite(inv.token)).toThrow(/invalide/)
+  })
+
+  it("ne supprime qu'avec le nom exact de l'arbre", () => {
+    const { meta, id } = setup()
+    expect(() => meta.deleteTree(id, alice)).toThrow(/nom exact/)
+    expect(() => meta.deleteTree(id, alice, 'famille')).toThrow(/nom exact/)
+    expect(meta.listTrees(alice)).toHaveLength(1)
+    expect(meta.deleteTree(id, alice, ' Famille ').name).toBe('Famille')
   })
 
   it('refuse un nom vide', () => {
