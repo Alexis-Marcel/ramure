@@ -12,7 +12,7 @@ import {
   type Account,
   type AuthConfig,
 } from './auth'
-import { closeTree, forgetTreeCaches, openLocal, openTree, setPresence } from './collab'
+import { closeTree, forgetTreeCaches, markLocalTreeImported, openLocal, openTree, setPresence } from './collab'
 import { InviteView, Landing } from './components/Landing'
 import { SharePanel } from './components/SharePanel'
 import { TreesHome } from './components/TreesHome'
@@ -154,7 +154,11 @@ export function AccountRoot({ config }: { config: AuthConfig }) {
 
   const importLocal = (tree: TreeSummary, local: Tree) => {
     go(`?arbre=${tree.id}`)
-    void showTree(tree.id, () => useStore.getState().setTree(local))
+    void showTree(tree.id, () => {
+      useStore.getState().setTree(local)
+      // la copie locale reste (filet de sécurité) mais n'est plus proposée à l'import
+      markLocalTreeImported()
+    })
   }
 
   switch (view.kind) {

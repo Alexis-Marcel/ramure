@@ -126,6 +126,26 @@ export async function peekLocalTree(): Promise<Tree> {
   return tree
 }
 
+const LOCAL_IMPORTED_KEY = 'ramure:local-importe'
+
+/** L'arbre local a déjà été importé dans le compte : on ne le propose plus. */
+export function localTreeImported(): boolean {
+  return localStorage.getItem(LOCAL_IMPORTED_KEY) === '1'
+}
+
+export function markLocalTreeImported() {
+  localStorage.setItem(LOCAL_IMPORTED_KEY, '1')
+}
+
+/** Efface l'arbre créé sans compte dans ce navigateur (et ses préférences). */
+export function clearLocalTree(): Promise<void> {
+  for (const key of [UI_KEY, LEGACY_KEY, SPACE_KEY, LOCAL_IMPORTED_KEY]) localStorage.removeItem(key)
+  return new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(LOCAL_DB)
+    req.onsuccess = req.onerror = req.onblocked = () => resolve()
+  })
+}
+
 // ----- Mode comptes : un arbre du serveur -----
 
 export interface TreeAccess {
