@@ -224,7 +224,8 @@ export function AccountRoot({ config }: { config: AuthConfig }) {
               onClose={() => setShareOpen(false)}
               onLeft={() => {
                 setShareOpen(false)
-                void forgetTreeCaches([]).then(() => home())
+                // la liste efface d'elle-même la copie locale des arbres qui ne sont plus accessibles
+                void home()
               }}
             />
           )}

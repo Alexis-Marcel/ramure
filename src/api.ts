@@ -63,7 +63,8 @@ export const api = {
   listTrees: () => call<TreeSummary[]>('GET', 'api/trees'),
   createTree: (name: string) => call<TreeSummary>('POST', 'api/trees', { name }),
   renameTree: (id: string, name: string) => call<TreeSummary>('PATCH', t(id), { name }),
-  deleteTree: (id: string) => call<{ ok: true }>('DELETE', t(id)),
+  /** `confirm` : le nom exact de l'arbre, exigé par le serveur. */
+  deleteTree: (id: string, confirm: string) => call<{ ok: true }>('DELETE', t(id), { confirm }),
   members: (id: string) => call<{ members: Member[]; invites: Invite[] }>('GET', `${t(id)}/members`),
   setRole: (id: string, memberId: string, role: Role) =>
     call<{ ok: true }>('PATCH', `${t(id)}/members/${encodeURIComponent(memberId)}`, { role }),

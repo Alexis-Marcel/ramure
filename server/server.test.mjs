@@ -4,7 +4,8 @@
  * Objectif : qu'aucun arbre ne fuite et qu'un lecteur ne puisse rien modifier.
  */
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import http from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -185,9 +186,17 @@ describe('mode comptes', () => {
     expect((await api('GET', '/api/trees', bob)).body).toEqual([])
   })
 
-  it("supprimer l'arbre efface son contenu", async () => {
-    expect((await api('DELETE', `/api/trees/${treeId}`, bob)).status).toBe(404)
-    expect((await api('DELETE', `/api/trees/${treeId}`, alice)).status).toBe(200)
+  it("supprimer l'arbre : nom exact exigé, copie en corbeille, contenu effacé", async () => {
+    expect((await api('DELETE', `/api/trees/${treeId}`, bob, { confirm: 'Famille' })).status).toBe(404)
+    // sans le nom (clic de travers, bug de l'appli) : refusé, l'arbre reste
+    expect((await api('DELETE', `/api/trees/${treeId}`, alice)).status).toBe(400)
+    expect((await api('DELETE', `/api/trees/${treeId}`, alice, { confirm: 'Autre' })).status).toBe(400)
+    expect((await api('GET', '/api/trees', alice)).body.map((t) => t.id)).toContain(treeId)
+    expect((await api('DELETE', `/api/trees/${treeId}`, alice, { confirm: 'Famille' })).status).toBe(200)
+    const trash = readdirSync(join(dataDir, 'corbeille'))
+    const copy = trash.find((f) => f.startsWith(treeId) && f.endsWith('.json'))
+    expect(copy).toBeTruthy()
+    expect(JSON.parse(readFileSync(join(dataDir, 'corbeille', copy), 'utf8'))).toMatchObject({ tree: { name: 'Famille' }, persons: 1 })
     expect(await connect(treeId, alice).opened).toBe('refusé')
     // recréé sous le même identifiant (cas de la migration), il repart vide
     const r = await api('POST', '/api/trees', alice, { name: 'Nouveau' })
@@ -195,5 +204,18 @@ describe('mode comptes', () => {
     await a.synced
     expect(persons(a.doc)).toEqual([])
     a.ws.close()
+  })
+
+  it('la corbeille se restaure (serveur arrêté)', async () => {
+    child.kill()
+    await new Promise((r) => child.once('exit', r))
+    const copy = readdirSync(join(dataDir, 'corbeille')).find((f) => f.startsWith(treeId) && f.endsWith('.json'))
+    const out = execFileSync(process.execPath, ['restaurer.mjs', join(dataDir, 'corbeille', copy)], {
+      cwd: new URL('.', import.meta.url).pathname,
+      env: { ...process.env, DATA_DIR: dataDir },
+    }).toString()
+    expect(out).toMatch(/« Famille » restauré : 1 personnes/)
+    const restoredMeta = JSON.parse(readFileSync(join(dataDir, 'ramure-meta.json'), 'utf8'))
+    expect(restoredMeta.trees[treeId].members.alice.role).toBe('owner')
   })
 })
