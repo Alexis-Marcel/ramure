@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import type { TreeSummary } from './api'
+import type { Account } from './auth'
 import { currentSpace, joinSpace, loadUiPrefs, spaceFromHash } from './collab'
 import { Canvas } from './components/Canvas'
 import { ChildUnionChooser } from './components/ChildUnionChooser'
@@ -28,8 +30,27 @@ function slugify(s: string): string {
   )
 }
 
-export default function App() {
+/**
+ * - legacy : serveur sans comptes (ou GitHub Pages), espace famille à lien secret ;
+ * - local : arbre de ce navigateur sur un serveur à comptes (« essayer sans compte ») ;
+ * - account : un arbre du compte.
+ */
+export type EditorMode =
+  | { kind: 'legacy' }
+  | { kind: 'local'; onLeave: () => void }
+  | {
+      kind: 'account'
+      tree: TreeSummary
+      me: Account
+      onHome: () => void
+      onShare: () => void
+      onRename: (name: string) => void
+      onSignOut: () => void
+    }
+
+export default function App({ mode }: { mode: EditorMode }) {
   const tree = useStore((s) => s.tree)
+  const readOnly = useStore((s) => s.readOnly)
   const focalId = useStore((s) => s.focalId)
   const selectedId = useStore((s) => s.selectedId)
   const select = useStore((s) => s.select)
@@ -43,14 +64,16 @@ export default function App() {
   // la modale s'ouvre d'emblée quand on arrive par un lien d'invitation inconnu
   const [collabOpen, setCollabOpen] = useState(() => {
     const fromLink = spaceFromHash()
-    return Boolean(fromLink && currentSpace()?.space !== fromLink.space)
+    return mode.kind === 'legacy' && Boolean(fromLink && currentSpace()?.space !== fromLink.space)
   })
 
   // rejoint l'espace famille : celui du lien d'invitation, sinon celui mémorisé
+  // (seulement sans comptes : le serveur à comptes refuse les liens secrets)
   useEffect(() => {
+    if (mode.kind !== 'legacy') return
     const space = spaceFromHash() ?? currentSpace()
     if (space) joinSpace(space, loadUiPrefs().name ?? 'Sans nom')
-  }, [])
+  }, [mode.kind])
 
   const hasData = Object.keys(tree.persons).length > 0
   const layout = useMemo(
@@ -105,6 +128,8 @@ export default function App() {
   return (
     <div className="app">
       <TopBar
+        mode={mode}
+        readOnly={readOnly}
         hasData={hasData}
         onImport={handleImport}
         onExportGedcom={() =>
@@ -120,6 +145,9 @@ export default function App() {
         onExportHtml={handleExportHtml}
         onCollab={() => setCollabOpen(true)}
       />
+      {readOnly && (
+        <p className="readonly-banner">Lecture seule : tu peux consulter cet arbre, pas le modifier.</p>
+      )}
       <div className="workspace">
         <Sidebar />
         {!hydrated ? (
@@ -131,12 +159,14 @@ export default function App() {
             selectedId={selectedId}
             onSelect={select}
             onFocus={setFocal}
-            actions={{
-              onAddParents: addParents,
-              onAddPartner: addPartner,
-              onAddChild: requestAddChild,
-            }}
+            actions={
+              readOnly
+                ? undefined
+                : { onAddParents: addParents, onAddPartner: addPartner, onAddChild: requestAddChild }
+            }
           />
+        ) : readOnly ? (
+          <div className="loading">Cet arbre est encore vide.</div>
         ) : (
           <EmptyState onImport={handleImport} />
         )}

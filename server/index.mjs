@@ -7,6 +7,13 @@
  *
  * Aucune base de données externe : LevelDB est embarqué, la sauvegarde
  * consiste à copier le dossier de données.
+ *
+ * Deux modes :
+ *  - sans OIDC_ISSUER (défaut) : espaces famille à lien secret, comme avant ;
+ *  - avec OIDC_ISSUER + OIDC_CLIENT_ID : comptes (Compte Eriphe…). Chaque arbre
+ *    a ses membres et leurs rôles ; la synchro exige un jeton valide et
+ *    l'appartenance à l'arbre, un lecteur ne peut rien modifier, et les liens
+ *    secrets ne donnent plus accès à rien.
  */
 import http from 'node:http'
 import { existsSync, readFileSync, statSync } from 'node:fs'
@@ -18,15 +25,45 @@ import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { LeveldbPersistence } from 'y-leveldb'
+import { createApi } from './api.mjs'
+import { bearer, createVerifier } from './auth.mjs'
+import { MetaStore } from './meta.mjs'
 
 const PORT = Number(process.env.PORT ?? 8484)
 const DATA_DIR = process.env.DATA_DIR ?? './data'
 const STATIC_DIR = process.env.STATIC_DIR ?? './public'
+const OIDC_ISSUER = process.env.OIDC_ISSUER ?? ''
+const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID ?? ''
 
 const MESSAGE_SYNC = 0
 const MESSAGE_AWARENESS = 1
 
 const ldb = new LeveldbPersistence(DATA_DIR)
+
+// ----- Mode comptes -----
+
+const accounts = Boolean(OIDC_ISSUER && OIDC_CLIENT_ID)
+// à côté des fichiers LevelDB, qui ignorent les fichiers qui ne sont pas les leurs
+const meta = accounts ? new MetaStore(join(DATA_DIR, 'ramure-meta.json')) : null
+// Ne pas démarrer « ouvert » quand des comptes sont configurés : on plante plutôt.
+const verify = accounts ? await createVerifier({ issuer: OIDC_ISSUER, audience: OIDC_CLIENT_ID }) : null
+const api =
+  accounts &&
+  createApi({
+    meta,
+    verify,
+    config: { issuer: OIDC_ISSUER, clientId: OIDC_CLIENT_ID },
+    onTreeDeleted: async (treeId) => {
+      const space = await spaces.get(treeId)
+      space?.closeConnections()
+      spaces.delete(treeId)
+      await ldb.clearDocument(treeId)
+    },
+    onAccessChanged: async (treeId, userId) => {
+      // l'intéressé se reconnecte avec ses nouveaux droits (ou est refusé)
+      ;(await spaces.get(treeId))?.closeConnections(userId)
+    },
+  })
 
 class SpaceDoc extends Y.Doc {
   /** @param {string} name */
@@ -55,11 +92,19 @@ class SpaceDoc extends Y.Doc {
 
     this.on('update', (update) => {
       ldb.storeUpdate(this.name, update)
+      meta?.markUpdated(this.name)
       const enc = encoding.createEncoder()
       encoding.writeVarUint(enc, MESSAGE_SYNC)
       syncProtocol.writeUpdate(enc, update)
       this.broadcast(encoding.toUint8Array(enc))
     })
+  }
+
+  /** Ferme les connexions (toutes, ou celles d'un compte). @param {string} [userId] */
+  closeConnections(userId) {
+    for (const conn of this.conns.keys()) {
+      if (!userId || conn.userId === userId) conn.close(4403, 'accès modifié')
+    }
   }
 
   /** @param {Uint8Array} message */
@@ -104,6 +149,8 @@ function setupConnection(conn, doc) {
       const dec = decoding.createDecoder(new Uint8Array(data))
       const type = decoding.readVarUint(dec)
       if (type === MESSAGE_SYNC) {
+        // lecteur : il peut demander l'état (étape 1), jamais envoyer de modification
+        if (conn.readOnly && decoding.peekVarUint(dec) !== syncProtocol.messageYjsSyncStep1) return
         const enc = encoding.createEncoder()
         encoding.writeVarUint(enc, MESSAGE_SYNC)
         syncProtocol.readSyncMessage(dec, enc, doc, conn)
@@ -159,11 +206,18 @@ const MIME = {
   '.ico': 'image/x-icon',
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   if (url.pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end('{"status":"ok"}')
+    return
+  }
+  if (api && (await api(req, res, url))) return
+  if (url.pathname === '/api/config') {
+    // mode espaces à lien secret : l'app n'affiche pas de connexion
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end('{"auth":null}')
     return
   }
   let file = normalize(join(STATIC_DIR, url.pathname))
@@ -183,7 +237,7 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ noServer: true })
 
-server.on('upgrade', (req, socket, head) => {
+server.on('upgrade', async (req, socket, head) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   if (!url.pathname.startsWith('/sync/')) {
     socket.destroy()
@@ -194,12 +248,34 @@ server.on('upgrade', (req, socket, head) => {
     socket.destroy()
     return
   }
-  wss.handleUpgrade(req, socket, head, async (ws) => {
+  /** @type {{ userId?: string, readOnly: boolean }} */
+  let access = { readOnly: false }
+  if (accounts) {
+    // jeton valide et membre de l'arbre, sinon refus avant même l'ouverture
+    let role = null
+    try {
+      const user = await verify(bearer(req, url))
+      role = meta.roleOf(name, user.id)
+      access = { userId: user.id, readOnly: role === 'viewer' }
+    } catch {
+      // jeton absent, expiré ou invalide
+    }
+    if (!role) {
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n')
+      return
+    }
+  }
+  // chargé avant d'accepter : sinon le premier message du client (sa demande
+  // d'état) peut arriver avant que l'écoute soit en place, et se perdre
+  const space = await getSpace(name)
+  wss.handleUpgrade(req, socket, head, (ws) => {
     ws.isAlive = true
+    ws.userId = access.userId
+    ws.readOnly = access.readOnly
     ws.on('pong', () => {
       ws.isAlive = true
     })
-    setupConnection(ws, await getSpace(name))
+    setupConnection(ws, space)
   })
 })
 

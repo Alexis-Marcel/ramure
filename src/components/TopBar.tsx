@@ -1,6 +1,9 @@
+import type { EditorMode } from '../App'
 import { useSync } from './useSync'
 
 interface Props {
+  mode: EditorMode
+  readOnly: boolean
   hasData: boolean
   onImport: () => void
   onExportGedcom: () => void
@@ -10,6 +13,8 @@ interface Props {
 }
 
 export function TopBar({
+  mode,
+  readOnly,
   hasData,
   onImport,
   onExportGedcom,
@@ -18,8 +23,31 @@ export function TopBar({
   onCollab,
 }: Props) {
   const { status, peers } = useSync()
+  const account = mode.kind === 'account' ? mode : null
   return (
     <header className="topbar">
+      {account ? (
+        <div className="brand">
+          <button className="btn" onClick={account.onHome} title="Mes arbres">
+            ← Mes arbres
+          </button>
+          <button
+            className="tree-title"
+            disabled={account.tree.role === 'viewer'}
+            title={account.tree.role === 'viewer' ? undefined : "Renommer l'arbre"}
+            onClick={() => {
+              const name = prompt("Nom de l'arbre", account.tree.name)
+              if (name?.trim() && name.trim() !== account.tree.name) account.onRename(name.trim())
+            }}
+          >
+            {account.tree.name}
+          </button>
+          <span className="sync-dot" title={peers.length ? `En ligne : ${peers.join(', ')}` : undefined}>
+            <span className={`dot dot-${status}`} aria-hidden="true" />
+            {status === 'connected' && peers.length > 0 && `${peers.length + 1} en ligne`}
+          </span>
+        </div>
+      ) : (
       <div className="brand">
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -33,15 +61,30 @@ export function TopBar({
         <span className="brand-name">Ramure</span>
         <span className="brand-tagline">votre arbre, chez vous</span>
       </div>
+      )}
       <div className="topbar-actions">
-        <button className="btn" onClick={onCollab}>
-          <span className={`dot dot-${status}`} aria-hidden="true" />
-          Famille
-          {status === 'connected' && peers.length > 0 && ` (${peers.length + 1})`}
-        </button>
-        <button className="btn" onClick={onImport}>
-          Importer
-        </button>
+        {mode.kind === 'legacy' && (
+          <button className="btn" onClick={onCollab}>
+            <span className={`dot dot-${status}`} aria-hidden="true" />
+            Famille
+            {status === 'connected' && peers.length > 0 && ` (${peers.length + 1})`}
+          </button>
+        )}
+        {mode.kind === 'local' && (
+          <button className="btn" onClick={mode.onLeave}>
+            Se connecter
+          </button>
+        )}
+        {account && (
+          <button className="btn" onClick={account.onShare}>
+            Partager
+          </button>
+        )}
+        {!readOnly && (
+          <button className="btn" onClick={onImport}>
+            Importer
+          </button>
+        )}
         <details className="menu">
           <summary className="btn" role="button">
             Exporter
@@ -58,6 +101,18 @@ export function TopBar({
             </button>
           </div>
         </details>
+        {account && (
+          <details className="menu">
+            <summary className="btn" role="button" title={account.me.email}>
+              {account.me.name}
+            </summary>
+            <div className="menu-list">
+              <button onClick={account.onSignOut}>
+                Se déconnecter <span>efface aussi les copies des arbres sur cet appareil</span>
+              </button>
+            </div>
+          </details>
+        )}
       </div>
     </header>
   )
