@@ -69,6 +69,7 @@ export function EditPanel() {
   const addChild = useStore((s) => s.addChild)
   const removeUnionPartner = useStore((s) => s.removeUnionPartner)
   const removeUnionChild = useStore((s) => s.removeUnionChild)
+  const readOnly = useStore((s) => s.readOnly)
 
   const [pick, setPick] = useState<PickTarget | null>(null)
 
@@ -129,6 +130,8 @@ export function EditPanel() {
         </button>
       </header>
 
+      {/* lecteur : un fieldset désactivé neutralise tous les champs et boutons de la fiche */}
+      <fieldset className="panel-fieldset" disabled={readOnly}>
       <div className="panel-body">
         <div className="field-row">
           <Field label="Prénom" value={person.givenName} onChange={(v) => set({ givenName: v })} />
@@ -343,8 +346,9 @@ export function EditPanel() {
           Supprimer cette personne
         </button>
       </div>
+      </fieldset>
 
-      {pick && pickerText && (
+      {pick && pickerText && !readOnly && (
         <PersonPicker
           title={pickerText.title}
           createLabel={pickerText.createLabel}

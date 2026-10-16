@@ -11,33 +11,9 @@ import {
   type Space,
   type SyncStatus,
 } from '../collab'
+import { copyText } from '../files'
 import { useSync } from './useSync'
 
-/** Copie robuste : l'API clipboard n'existe qu'en contexte sécurisé (HTTPS ou
- * localhost) ; en HTTP local (accès direct par IP) on passe par la sélection. */
-async function copyText(text: string): Promise<boolean> {
-  if (window.isSecureContext && navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch {
-      // refusé par le navigateur : on tente la méthode historique
-    }
-  }
-  try {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.style.position = 'fixed'
-    ta.style.opacity = '0'
-    document.body.appendChild(ta)
-    ta.select()
-    const ok = document.execCommand('copy')
-    ta.remove()
-    return ok
-  } catch {
-    return false
-  }
-}
 
 const STATUS_LABEL: Record<SyncStatus, string> = {
   off: 'hors connexion',
