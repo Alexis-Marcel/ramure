@@ -48,6 +48,36 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
     }
   }
 
+  /** Propriétaire : supprime l'arbre pour tous (nom à retaper). Sinon : quitte l'arbre. */
+  const remove = async (t: TreeSummary) => {
+    if (t.role === 'owner') {
+      const typed = prompt(
+        `Supprimer « ${t.name} » définitivement, pour ses ${t.members} membre${t.members > 1 ? 's' : ''} ?\n` +
+          `Pense à exporter une sauvegarde avant. Pour confirmer, retape le nom de l'arbre :`,
+      )
+      if (typed === null) return
+      if (typed.trim() !== t.name) {
+        setError("Le nom ne correspond pas : l'arbre n'a pas été supprimé.")
+        return
+      }
+    } else if (!confirm(`Quitter « ${t.name} » ? Il faudra une nouvelle invitation pour y revenir.`)) {
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      if (t.role === 'owner') await api.deleteTree(t.id)
+      else await api.removeMember(t.id, me.id)
+      const rest = (trees ?? []).filter((x) => x.id !== t.id)
+      setTrees(rest)
+      await forgetTreeCaches(rest.map((x) => x.id))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const localCount = local ? Object.keys(local.persons).length : 0
 
   return (
@@ -96,7 +126,15 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
       )}
       <ul className="tree-list">
         {trees?.map((t) => (
-          <li key={t.id}>
+          <li key={t.id} className="tree-row">
+            <button
+              className="tree-remove"
+              disabled={busy}
+              onClick={() => void remove(t)}
+              title={t.role === 'owner' ? "Supprimer l'arbre" : "Quitter l'arbre"}
+            >
+              {t.role === 'owner' ? 'Supprimer' : 'Quitter'}
+            </button>
             <button className="tree-card" onClick={() => onOpen(t)}>
               <span className="tree-card-name">{t.name}</span>
               <span className="tree-card-meta">
