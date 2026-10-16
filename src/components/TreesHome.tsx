@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ROLE_LABEL, type TreeSummary } from '../api'
 import type { Account } from '../auth'
-import { forgetTreeCaches, peekLocalTree } from '../collab'
+import { clearLocalTree, forgetTreeCaches, localTreeImported, peekLocalTree } from '../collab'
 import type { Tree } from '../types'
 
 interface Props {
@@ -30,7 +30,9 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
         void forgetTreeCaches(list.map((t) => t.id))
       })
       .catch((e: Error) => !cancelled && setError(e.message))
-    peekLocalTree().then((t) => !cancelled && setLocal(Object.keys(t.persons).length > 0 ? t : null))
+    if (!localTreeImported()) {
+      peekLocalTree().then((t) => !cancelled && setLocal(Object.keys(t.persons).length > 0 ? t : null))
+    }
     return () => {
       cancelled = true
     }
@@ -114,6 +116,16 @@ export function TreesHome({ me, onOpen, onImportLocal, notice }: Props) {
             }}
           >
             Importer dans mon compte
+          </button>
+          <button
+            className="link"
+            disabled={busy}
+            onClick={() => {
+              if (!confirm(`Effacer l'arbre de ce navigateur (${localCount} personne${localCount > 1 ? 's' : ''}) ? Il n'est pas dans ton compte : il sera perdu.`)) return
+              void clearLocalTree().then(() => setLocal(null))
+            }}
+          >
+            Effacer de ce navigateur
           </button>
         </div>
       )}
