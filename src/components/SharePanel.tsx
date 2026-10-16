@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, inviteUrl, ROLE_LABEL, type Invite, type Member, type TreeSummary } from '../api'
 import type { Account } from '../auth'
+import { confirmTreeDeletion } from '../confirm'
 import { copyText } from '../files'
 
 interface Props {
@@ -164,9 +165,10 @@ export function SharePanel({ tree, me, onClose, onLeft }: Props) {
               <button
                 className="btn-danger"
                 onClick={async () => {
-                  if (!confirm(`Supprimer définitivement « ${tree.name} » pour tous ses membres ?`)) return
+                  const confirmName = confirmTreeDeletion({ name: tree.name, members: members.length })
+                  if (confirmName === null) return
                   try {
-                    await api.deleteTree(tree.id)
+                    await api.deleteTree(tree.id, confirmName)
                     onLeft()
                   } catch (e) {
                     setError((e as Error).message)

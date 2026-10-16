@@ -114,12 +114,27 @@ export class MetaStore {
     return this.summary(tree, user)
   }
 
-  deleteTree(treeId, user) {
-    this.require(treeId, user, ['owner'])
+  /**
+   * Suppression : réservée au propriétaire, et seulement avec le nom exact de l'arbre — un clic de
+   * travers ou un bug de l'appli ne peut rien effacer. Renvoie l'arbre retiré (pour la corbeille).
+   */
+  deleteTree(treeId, user, confirmName) {
+    const { tree } = this.require(treeId, user, ['owner'])
+    if (String(confirmName ?? '').trim() !== tree.name) {
+      throw new HttpError(400, "Retape le nom exact de l'arbre pour le supprimer")
+    }
     delete this.data.trees[treeId]
     for (const [token, inv] of Object.entries(this.data.invites)) {
       if (inv.treeId === treeId) delete this.data.invites[token]
     }
+    this.save()
+    return tree
+  }
+
+  /** Remet un arbre sorti de la corbeille (script de restauration). */
+  restoreTree(tree) {
+    if (this.data.trees[tree.id]) throw new Error(`l'arbre ${tree.id} existe déjà`)
+    this.data.trees[tree.id] = tree
     this.save()
   }
 

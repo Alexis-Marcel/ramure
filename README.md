@@ -63,7 +63,7 @@ Avec un fournisseur OIDC (Authentik, Keycloak…), Ramure passe en **mode compte
 
 Côté fournisseur : un client **public** (code d'autorisation + PKCE), adresse de retour = la racine du site (`https://ramure.exemple.fr/`), portées `openid email profile`, et un `sub` stable (UUID). La connexion est silencieuse si le fournisseur partage le site de Ramure (même domaine parent) : déjà connecté chez lui, on l'est dans Ramure.
 
-En mode comptes, le serveur exige un jeton valide et l'appartenance à l'arbre pour toute synchro ; un lecteur ne peut rien modifier, même en trafiquant l'app ; les liens d'espace famille secrets ne donnent plus accès à rien. Les membres et invitations sont dans `ramure-meta.json` (dossier de données). À la déconnexion, les copies hors-ligne des arbres sont effacées de l'appareil. Sans ces variables, rien ne change : espaces famille à lien secret comme ci-dessous.
+En mode comptes, le serveur exige un jeton valide et l'appartenance à l'arbre pour toute synchro ; un lecteur ne peut rien modifier, même en trafiquant l'app ; les liens d'espace famille secrets ne donnent plus accès à rien. Les membres et invitations sont dans `ramure-meta.json` (dossier de données). Supprimer un arbre exige son nom exact (vérifié par le serveur) et en garde une copie complète dans `corbeille/` ; pour la restaurer, serveur arrêté : `node restaurer.mjs /data/corbeille/<arbre>-<date>.json` (dans l'image Docker : `docker run --rm -v <données>:/data --entrypoint node ghcr.io/alexis-marcel/ramure restaurer.mjs …`). À la déconnexion, les copies hors-ligne des arbres sont effacées de l'appareil. Sans ces variables, rien ne change : espaces famille à lien secret comme ci-dessous.
 
 ### Créer un espace famille
 
