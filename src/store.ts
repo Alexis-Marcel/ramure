@@ -3,7 +3,7 @@ import type { Person, Tree, Union } from './types'
 import { emptyTree } from './types'
 import { reconcile } from './gedcom'
 import { SAMPLE_FOCAL_ID, sampleTree } from './data/sample'
-import { loadUiPrefs, localReady, onRemoteChange, readTree, saveUiPrefs, writeTree } from './collab'
+import { loadUiPrefs, onRemoteChange, onTreeOpened, readTree, saveUiPrefs, writeTree } from './collab'
 
 /** Identifiants aléatoires : deux membres de la famille peuvent créer des
  * personnes hors-ligne sans risque de collision à la fusion. */
@@ -34,6 +34,8 @@ interface State {
   focalId: string | null
   selectedId: string | null
   hydrated: boolean
+  /** arbre partagé en lecture seule : aucune modification possible (le serveur refuse aussi) */
+  readOnly: boolean
   setTree: (tree: Tree, focalId?: string | null) => void
   setFocal: (id: string) => void
   select: (id: string | null) => void
@@ -63,6 +65,7 @@ interface State {
 
 export const useStore = create<State>((set, get) => {
   const commit = (mutate: (tree: Tree) => void, extra?: Partial<State>) => {
+    if (get().readOnly) return
     const tree = structuredClone(get().tree)
     mutate(tree)
     reconcile(tree)
@@ -74,8 +77,10 @@ export const useStore = create<State>((set, get) => {
     focalId: null,
     selectedId: null,
     hydrated: false,
+    readOnly: false,
 
     setTree: (tree, focalId) => {
+      if (get().readOnly) return
       reconcile(tree)
       const focal =
         focalId !== undefined ? focalId : (Object.keys(tree.persons)[0] ?? null)
@@ -286,10 +291,12 @@ export const useStore = create<State>((set, get) => {
       }),
 
     loadSample: () => {
+      if (get().readOnly) return
       set({ tree: sampleTree(), focalId: SAMPLE_FOCAL_ID, selectedId: null })
     },
 
     clearAll: () => {
+      if (get().readOnly) return
       set({ tree: emptyTree(), focalId: null, selectedId: null })
     },
   }
@@ -299,7 +306,15 @@ export const useStore = create<State>((set, get) => {
 
 let applyingRemote = false
 
-localReady.then(() => {
+/** Avant d'ouvrir un autre arbre : plus d'écriture vers l'ancien document. */
+export function beginTreeSwitch(readOnly: boolean) {
+  applyingRemote = true
+  useStore.setState({ hydrated: false, readOnly, tree: emptyTree(), focalId: null, selectedId: null })
+  applyingRemote = false
+}
+
+// chaque ouverture d'arbre (local ou du compte) recharge l'état
+onTreeOpened(() => {
   const tree = readTree()
   reconcile(tree)
   const prefs = loadUiPrefs()
@@ -308,26 +323,27 @@ localReady.then(() => {
       ? prefs.focalId
       : (Object.keys(tree.persons)[0] ?? null)
   applyingRemote = true
-  useStore.setState({ tree, focalId, hydrated: true })
+  useStore.setState({ tree, focalId, selectedId: null, hydrated: true })
   applyingRemote = false
+})
 
-  onRemoteChange((remoteTree) => {
-    reconcile(remoteTree)
-    const { focalId: cur, selectedId } = useStore.getState()
-    applyingRemote = true
-    useStore.setState({
-      tree: remoteTree,
-      focalId:
-        cur && remoteTree.persons[cur] ? cur : (Object.keys(remoteTree.persons)[0] ?? null),
-      selectedId: selectedId && remoteTree.persons[selectedId] ? selectedId : null,
-    })
-    applyingRemote = false
+onRemoteChange((remoteTree) => {
+  if (!useStore.getState().hydrated) return
+  reconcile(remoteTree)
+  const { focalId: cur, selectedId } = useStore.getState()
+  applyingRemote = true
+  useStore.setState({
+    tree: remoteTree,
+    focalId:
+      cur && remoteTree.persons[cur] ? cur : (Object.keys(remoteTree.persons)[0] ?? null),
+    selectedId: selectedId && remoteTree.persons[selectedId] ? selectedId : null,
   })
+  applyingRemote = false
 })
 
 useStore.subscribe((state, prev) => {
   if (!state.hydrated) return
-  if (!applyingRemote && state.tree !== prev.tree) writeTree(state.tree)
+  if (!applyingRemote && !state.readOnly && state.tree !== prev.tree) writeTree(state.tree)
   if (state.focalId !== prev.focalId) {
     saveUiPrefs({ ...loadUiPrefs(), focalId: state.focalId ?? undefined })
   }
